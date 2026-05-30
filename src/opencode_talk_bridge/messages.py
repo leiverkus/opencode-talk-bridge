@@ -48,12 +48,14 @@ DE: dict[str, str] = {
     "title_projects": "📁 Projekte:",
     "title_worktrees": "🌿 Worktrees:",
     "title_commands": "⚡ Commands:",
+    "title_skills": "🧩 Skills:",
     "title_mcps": "🔌 MCP-Server:",
     "title_messages": "💬 Nachrichten:",
     "title_action": "Aktion:",
     "no_projects": "Keine Projekte gefunden.",
     "no_worktrees": "Keine Worktrees gefunden.",
     "no_commands": "Keine Commands verfügbar.",
+    "no_skills": "Keine Skills verfügbar.",
     "no_mcps": "Keine MCP-Server konfiguriert.",
     "no_messages": "Keine Nachrichten.",
     "dir_switched": "✅ {kind} gewechselt: {directory}\nNeue Session beim nächsten Prompt.",
@@ -98,6 +100,7 @@ DE: dict[str, str] = {
         "• /projects — OpenCode-Projekt wechseln\n"
         "• /worktree — Git-Worktree wechseln\n"
         "• /commands — eigene OpenCode-Commands ausführen\n"
+        "• /skills — OpenCode-Skills ausführen\n"
         "• /mcps — MCP-Server aktivieren/deaktivieren\n"
         "• /tts — Sprachausgabe umschalten (falls konfiguriert)\n"
         "• /task <Min> <Prompt> — Aufgabe planen (/task every <Min> … für wiederkehrend)\n"
@@ -145,12 +148,14 @@ EN: dict[str, str] = {
     "title_projects": "📁 Projects:",
     "title_worktrees": "🌿 Worktrees:",
     "title_commands": "⚡ Commands:",
+    "title_skills": "🧩 Skills:",
     "title_mcps": "🔌 MCP servers:",
     "title_messages": "💬 Messages:",
     "title_action": "Action:",
     "no_projects": "No projects found.",
     "no_worktrees": "No worktrees found.",
     "no_commands": "No commands available.",
+    "no_skills": "No skills available.",
     "no_mcps": "No MCP servers configured.",
     "no_messages": "No messages.",
     "dir_switched": "✅ {kind} switched: {directory}\nNew session on the next prompt.",
@@ -191,6 +196,7 @@ EN: dict[str, str] = {
         "• /projects — switch the OpenCode project\n"
         "• /worktree — switch the git worktree\n"
         "• /commands — browse & run custom OpenCode commands\n"
+        "• /skills — browse & run OpenCode skills\n"
         "• /mcps — enable/disable MCP servers\n"
         "• /tts — toggle spoken replies (if configured)\n"
         "• /task <min> <prompt> — schedule a task (/task every <min> … to repeat)\n"

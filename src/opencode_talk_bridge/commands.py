@@ -20,6 +20,7 @@ COMMANDS = (
     "worktree",
     "messages",
     "commands",
+    "skills",
     "mcps",
     "rename",
     "detach",

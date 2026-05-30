@@ -57,6 +57,7 @@ class FakeOpenCode:
         self.projects_list: list[dict] = []
         self.worktrees_list: list[str] = []
         self.commands_list: list[dict] = []
+        self.skills_list: list[dict] = []
         self.messages_list: list[dict] = []
         self.mcps_dict: dict = {}
         self.created_dirs: list = []
@@ -106,6 +107,9 @@ class FakeOpenCode:
 
     def list_commands(self):
         return self.commands_list
+
+    def list_skills(self):
+        return self.skills_list
 
     def list_mcps(self):
         return self.mcps_dict
@@ -425,11 +429,29 @@ def test_worktree_switch(bridge):
 
 
 def test_commands_picker_runs_command(bridge):
-    bridge.oc.commands_list = [{"name": "review", "description": "review code"}]
+    bridge.oc.commands_list = [{"name": "review", "description": "review code", "source": "command"}]
     bridge._handle_message(TOKEN, _msg("/commands"))
     bridge._handle_message(TOKEN, _msg("1"))
     _join_workers(bridge)
     assert bridge.oc.ran_commands == ["review"]
+
+
+def test_commands_picker_excludes_skills(bridge):
+    bridge.oc.commands_list = [
+        {"name": "review", "source": "command"},
+        {"name": "pdf", "source": "skill"},
+    ]
+    bridge._handle_message(TOKEN, _msg("/commands"))
+    pending = bridge._pending.get(TOKEN)
+    assert [i.value for i in pending.items] == ["review"]  # skill filtered out
+
+
+def test_skills_picker_runs_skill(bridge):
+    bridge.oc.skills_list = [{"name": "pdf", "description": "PDF skill"}]
+    bridge._handle_message(TOKEN, _msg("/skills"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    _join_workers(bridge)
+    assert bridge.oc.ran_commands == ["pdf"]
 
 
 def test_mcps_toggle(bridge):

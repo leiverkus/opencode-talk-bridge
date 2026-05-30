@@ -111,6 +111,7 @@ Send any message (or a **voice note** / **file**) to prompt OpenCode. The reply
 | `/projects` | Switch the OpenCode project. |
 | `/worktree` | Switch the git worktree. |
 | `/commands` | Browse & run custom OpenCode commands. |
+| `/skills` | Browse & run OpenCode skills. |
 | `/mcps` | Enable/disable MCP servers. |
 | `/tts` | Toggle spoken (audio) replies (needs `TTS_*` + `SHARE_WEBDAV_DIR`). |
 | `/task <min> <prompt>` | Schedule a task (`/task every <min> …` to repeat). |

@@ -285,6 +285,7 @@ class Bridge:
             "worktree": lambda: self._cmd_worktree(token),
             "messages": lambda: self._cmd_messages(token),
             "commands": lambda: self._cmd_commands(token),
+            "skills": lambda: self._cmd_skills(token),
             "mcps": lambda: self._cmd_mcps(token),
             "rename": lambda: self._cmd_rename(token, cmd.arg),
             "detach": lambda: self._cmd_detach(token),
@@ -445,6 +446,8 @@ class Bridge:
         except OpenCodeDownError:
             self._say(token, self._t("down"))
             return
+        # Skills also surface here with source "skill"; show them under /skills.
+        cmds = [c for c in cmds if c.get("source") != "skill"]
         items = [
             SelectItem(label=c["name"], value=c["name"], description=(c.get("description") or "")[:40])
             for c in cmds[: self._cfg.list_limit]
@@ -455,6 +458,24 @@ class Bridge:
             return
         self._offer_selection(
             token, self._t("title_commands"), items, lambda name: self._run_command(token, name)
+        )
+
+    def _cmd_skills(self, token: str) -> None:
+        try:
+            skills = self._oc.list_skills()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        items = [
+            SelectItem(label=s["name"], value=s["name"], description=(s.get("description") or "")[:40])
+            for s in skills[: self._cfg.list_limit]
+            if s.get("name")
+        ]
+        if not items:
+            self._say(token, self._t("no_skills"))
+            return
+        self._offer_selection(
+            token, self._t("title_skills"), items, lambda name: self._run_command(token, name)
         )
 
     def _run_command(self, token: str, name: str) -> None:

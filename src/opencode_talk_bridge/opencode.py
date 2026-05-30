@@ -249,10 +249,12 @@ class OpenCodeClient:
     def list_commands(self) -> list[dict[str, Any]]:
         return self._get("/command") or []
 
+    def list_skills(self) -> list[dict[str, Any]]:
+        return self._get("/skill") or []
+
     def run_command(self, session_id: str, command: str, arguments: str = "") -> PromptResult:
-        body: dict[str, Any] = {"command": command}
-        if arguments:
-            body["arguments"] = arguments
+        # `arguments` is a required field on the command endpoint, even when empty.
+        body: dict[str, Any] = {"command": command, "arguments": arguments}
         data = self._post(f"/session/{session_id}/command", body, timeout=self._prompt_timeout)
         return _prompt_result(data)
 

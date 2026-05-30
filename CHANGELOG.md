@@ -6,6 +6,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-05-31
+
+### Added
+- `/skills` — browse & run OpenCode skills (via `GET /skill`).
+
+### Fixed
+- `run_command` now always sends the required `arguments` field — without it the
+  command endpoint returned HTTP 400, so `/commands` (and any command run) was
+  broken.
+- `/commands` no longer lists skills (entries with `source == "skill"`); those
+  live under `/skills`.
+
 ## [0.2.0] - 2026-05-31
 
 Feature-parity push toward `grinev/opencode-telegram-bot`, adapted to Talk.
@@ -86,7 +98,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leiverkus/opencode-talk-bridge/releases/tag/v0.1.0

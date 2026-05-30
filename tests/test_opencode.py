@@ -176,6 +176,24 @@ def test_iter_events_transport_error():
         list(_client(boom).iter_events())
 
 
+def test_run_command_always_sends_arguments():
+    def handler(req):
+        body = json.loads(req.content)
+        assert body == {"command": "pdf", "arguments": ""}  # arguments is required
+        return httpx.Response(200, json={"info": {}, "parts": []})
+
+    _client(handler).run_command("ses_1", "pdf")
+
+
+def test_list_skills():
+    def handler(req):
+        assert req.url.path == "/skill"
+        return httpx.Response(200, json=[{"name": "pdf", "description": "PDF skill"}])
+
+    skills = _client(handler).list_skills()
+    assert skills[0]["name"] == "pdf"
+
+
 def test_parse_model():
     assert _parse_model(None) is None
     assert _parse_model("anthropic/claude") == {"providerID": "anthropic", "modelID": "claude"}
