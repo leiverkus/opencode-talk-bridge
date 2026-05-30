@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-05-31
+
+### Added
+- `opencode-talk-bridge --init` — interactive `.env` wizard. Prompts for the
+  essentials (Talk credentials, allowlist, OpenCode URL), hides the app password,
+  refuses to overwrite without confirmation, and writes the file `chmod 600`.
+
 ## [0.2.1] - 2026-05-31
 
 ### Added
@@ -98,7 +105,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.0...v0.1.1

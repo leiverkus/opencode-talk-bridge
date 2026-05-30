@@ -59,14 +59,16 @@ uv tool install git+https://github.com/leiverkus/opencode-talk-bridge.git
 # or:  pipx install git+https://github.com/leiverkus/opencode-talk-bridge.git
 ```
 
-Then grab the env template and run from wherever you keep it:
+Then create your config interactively and run:
 
 ```bash
-curl -O https://raw.githubusercontent.com/leiverkus/opencode-talk-bridge/main/.env.example
-mv .env.example .env            # then edit .env
+opencode-talk-bridge --init     # interactive .env wizard (chmod 600)
 opencode-talk-bridge --check    # validate config + OpenCode health
 opencode-talk-bridge            # run (reads ./.env, or pass --env-file PATH)
 ```
+
+`--init` asks only for the essentials; every other option keeps a safe default
+and can be added later (see [`.env.example`](.env.example) for the full list).
 
 Upgrade with `uv tool upgrade opencode-talk-bridge` (or `pipx upgrade …`).
 

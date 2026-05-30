@@ -26,12 +26,19 @@ from .tts import TTSClient
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="opencode-talk-bridge", description=__doc__)
     p.add_argument("--env-file", default=".env", help="path to a .env file (default: .env)")
+    p.add_argument("--init", action="store_true", help="interactively create the .env file, then exit")
     p.add_argument("--check", action="store_true", help="validate config + check OpenCode health, then exit")
     return p
 
 
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
+
+    if args.init:
+        from .init import run_init
+
+        return run_init(args.env_file)
+
     load_dotenv(args.env_file)
 
     try:
