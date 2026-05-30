@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd user-agent example for opencode-talk-bridge.
+
+  Install:
+    cp deploy/com.leiverkus.opencode-talk-bridge.plist ~/Library/LaunchAgents/
+    # edit the paths below, then:
+    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.leiverkus.opencode-talk-bridge.plist
+    launchctl kickstart -k gui/$(id -u)/com.leiverkus.opencode-talk-bridge
+
+  Stop / uninstall:
+    launchctl bootout gui/$(id -u)/com.leiverkus.opencode-talk-bridge
+
+  Secrets are read from the .env file in WorkingDirectory; do NOT put the app
+  password in this plist (it would be world-readable in ~/Library/LaunchAgents).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.leiverkus.opencode-talk-bridge</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <!-- Absolute path to the venv's console script (or python -m). -->
+        <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge/.venv/bin/opencode-talk-bridge</string>
+        <string>--env-file</string>
+        <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge/.env</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <dict>
+        <!-- Restart on crash, but not if it exits cleanly (e.g. SIGTERM). -->
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+    <!-- Back off restarts so a misconfigured bridge does not hot-loop. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/patrick/Library/Logs/opencode-talk-bridge.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/patrick/Library/Logs/opencode-talk-bridge.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
