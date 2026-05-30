@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-05-31
+
+### Fixed
+- `/sessions`, `/commands`, and `/skills` are **project-scoped** in OpenCode, but
+  the bridge listed them against the global `OPENCODE_DIRECTORY` and ignored the
+  per-conversation project chosen via `/projects`. They now use the
+  conversation's directory, so `/sessions` shows the same sessions as the
+  OpenCode desktop/TUI for that project (and follows `/projects` switches).
+  `/projects` itself is global (all known projects), matching desktop.
+
 ## [0.2.2] - 2026-05-31
 
 ### Added
@@ -105,7 +115,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.1...v0.2.0

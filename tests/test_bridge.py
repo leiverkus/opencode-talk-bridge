@@ -66,6 +66,7 @@ class FakeOpenCode:
         self.reverted: list[tuple[str, str]] = []
         self.toggled: list[tuple[str, bool]] = []
         self.prompts: list[tuple] = []
+        self.listed_dirs: list[tuple] = []
         self._sid = 0
 
     def health(self):
@@ -105,10 +106,12 @@ class FakeOpenCode:
     def list_worktrees(self):
         return self.worktrees_list
 
-    def list_commands(self):
+    def list_commands(self, directory=None):
+        self.listed_dirs.append(("commands", directory))
         return self.commands_list
 
-    def list_skills(self):
+    def list_skills(self, directory=None):
+        self.listed_dirs.append(("skills", directory))
         return self.skills_list
 
     def list_mcps(self):
@@ -134,7 +137,8 @@ class FakeOpenCode:
         self.replies.append((request_id, answer))
         return True
 
-    def list_sessions(self):
+    def list_sessions(self, directory=None):
+        self.listed_dirs.append(("sessions", directory))
         return self.sessions_list
 
     def list_models(self):
@@ -419,6 +423,22 @@ def test_new_session_uses_stored_directory(bridge):
     bridge._handle_message(TOKEN, _msg("build something"))
     _join_workers(bridge)
     assert bridge.oc.created_dirs == ["/work/b"]
+
+
+def test_sessions_listed_for_conversation_directory(bridge):
+    # After /projects binds a directory, /sessions must list THAT project's
+    # sessions (directory-scoped), not the global default.
+    bridge.store.set_directory(TOKEN, "/work/proj-b", now=1)
+    bridge.oc.sessions_list = [{"id": "ses_x", "title": "X"}]
+    bridge._handle_message(TOKEN, _msg("/sessions"))
+    assert ("sessions", "/work/proj-b") in bridge.oc.listed_dirs
+
+
+def test_sessions_global_when_no_directory(bridge):
+    # No project bound -> None -> server falls back to its default directory.
+    bridge.oc.sessions_list = [{"id": "ses_x", "title": "X"}]
+    bridge._handle_message(TOKEN, _msg("/sessions"))
+    assert ("sessions", None) in bridge.oc.listed_dirs
 
 
 def test_worktree_switch(bridge):

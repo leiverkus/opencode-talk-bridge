@@ -307,9 +307,15 @@ class Bridge:
         sid = self._store.session_id_for(token)
         self._say(token, self._t("session_is", sid=sid) if sid else self._t("no_session_yet"))
 
+    def _conv_dir(self, token: str) -> str | None:
+        """The project directory bound to this conversation (via /projects), or
+        None to fall back to the server's default (OPENCODE_DIRECTORY)."""
+        state = self._store.get(token)
+        return state.directory if state else None
+
     def _cmd_sessions(self, token: str) -> None:
         try:
-            sessions = self._oc.list_sessions()
+            sessions = self._oc.list_sessions(self._conv_dir(token))
         except OpenCodeDownError:
             self._say(token, self._t("down"))
             return
@@ -442,7 +448,7 @@ class Bridge:
 
     def _cmd_commands(self, token: str) -> None:
         try:
-            cmds = self._oc.list_commands()
+            cmds = self._oc.list_commands(self._conv_dir(token))
         except OpenCodeDownError:
             self._say(token, self._t("down"))
             return
@@ -462,7 +468,7 @@ class Bridge:
 
     def _cmd_skills(self, token: str) -> None:
         try:
-            skills = self._oc.list_skills()
+            skills = self._oc.list_skills(self._conv_dir(token))
         except OpenCodeDownError:
             self._say(token, self._t("down"))
             return

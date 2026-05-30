@@ -169,8 +169,10 @@ class OpenCodeClient:
             raise OpenCodeError(f"session create returned no id: {data!r}")
         return session_id
 
-    def list_sessions(self) -> list[dict[str, Any]]:
-        return self._get("/session")
+    def list_sessions(self, directory: str | None = None) -> list[dict[str, Any]]:
+        # /session is project-scoped: None -> client default directory; a path
+        # filters to that project (matching what the OpenCode TUI/desktop shows).
+        return self._get("/session", directory=directory or _DEFAULT_DIR) or []
 
     def abort(self, session_id: str) -> bool:
         return bool(self._post(f"/session/{session_id}/abort", {}))
@@ -246,11 +248,11 @@ class OpenCodeClient:
     def list_agents(self) -> list[dict[str, Any]]:
         return self._get("/agent") or []
 
-    def list_commands(self) -> list[dict[str, Any]]:
-        return self._get("/command") or []
+    def list_commands(self, directory: str | None = None) -> list[dict[str, Any]]:
+        return self._get("/command", directory=directory or _DEFAULT_DIR) or []
 
-    def list_skills(self) -> list[dict[str, Any]]:
-        return self._get("/skill") or []
+    def list_skills(self, directory: str | None = None) -> list[dict[str, Any]]:
+        return self._get("/skill", directory=directory or _DEFAULT_DIR) or []
 
     def run_command(self, session_id: str, command: str, arguments: str = "") -> PromptResult:
         # `arguments` is a required field on the command endpoint, even when empty.
@@ -318,9 +320,13 @@ class OpenCodeClient:
 
     # --- internal ----------------------------------------------------------
 
-    def _get(self, path: str) -> Any:
+    def _get(self, path: str, *, directory: str | None | object = _DEFAULT_DIR) -> Any:
+        if directory is _DEFAULT_DIR:
+            params = self._dir_params()
+        else:
+            params = {"directory": directory} if directory else None
         try:
-            resp = self._client.get(path, params=self._dir_params())
+            resp = self._client.get(path, params=params)
         except httpx.TransportError as exc:
             raise OpenCodeDownError(f"GET {path} failed: {exc}") from exc
         return self._unwrap(resp, path)

@@ -152,6 +152,12 @@ Send any message (or a **voice note** / **file**) to prompt OpenCode. The reply
 | `/status` | Show bridge & OpenCode health. |
 | `/help` | List commands. |
 
+`/projects` lists every project the OpenCode backend knows (same as the desktop
+app). `/sessions`, `/commands`, and `/skills` are **project-scoped**: they show
+what the conversation's current project shows — pick a project with `/projects`
+(or set a default `OPENCODE_DIRECTORY`). With no project bound, `/sessions` falls
+back to a global list across all projects.
+
 **No inline buttons** on Talk → every picker is a **numbered list**: reply with
 the number. When OpenCode asks **permission** for a dangerous action, reply
 **`ja`** (allow once), **`immer`** (allow for this session), or **`nein`** (deny);
