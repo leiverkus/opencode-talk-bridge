@@ -70,6 +70,10 @@ opencode-talk-bridge            # run (reads ./.env, or pass --env-file PATH)
 `--init` asks only for the essentials; every other option keeps a safe default
 and can be added later (see [`.env.example`](.env.example) for the full list).
 
+First run against a real Talk server? Follow the
+[end-to-end smoke test](docs/smoke-test.md) — it tests the riskiest paths first
+and covers the two-accounts gotcha.
+
 Upgrade with `uv tool upgrade opencode-talk-bridge` (or `pipx upgrade …`).
 
 <details>
