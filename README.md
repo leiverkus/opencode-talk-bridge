@@ -69,7 +69,13 @@ Edit `.env` (see [`.env.example`](.env.example) for the full list):
 | `OPENCODE_USERNAME` / `OPENCODE_PASSWORD` | – | Basic-Auth if your OpenCode server is secured. |
 | `OPENCODE_DIRECTORY` | – | Workspace directory for OpenCode sessions. |
 | `OPENCODE_MODEL` | – | Default model `providerID/modelID`. |
-| `SHARE_WEBDAV_DIR` | – | WebDAV folder (relative to user root) for code/long-output attachments. Created on demand; blank disables attachments. |
+| `SHARE_WEBDAV_DIR` | – | WebDAV folder (relative to user root) for code/long-output **and TTS** attachments. Created on demand; blank disables attachments. |
+| `RESPONSE_STREAMING`, `STREAM_THROTTLE_MS` | – | Live-stream replies via message editing (default on, 1500 ms throttle). |
+| `HIDE_TOOL_MESSAGES`, `HIDE_THINKING` | – | Suppress `💻 tool` / `💭 thinking` notices. |
+| `BOT_LOCALE` | – | UI language: `de` (default) or `en`. |
+| `STT_API_URL` / `STT_API_KEY` / `STT_MODEL` / `STT_LANGUAGE` | – | Whisper-compatible speech-to-text for voice notes. |
+| `TTS_API_URL` / `TTS_API_KEY` / `TTS_MODEL` / `TTS_VOICE` | – | OpenAI-compatible text-to-speech for `/tts` replies. |
+| `TASK_LIMIT`, `LIST_LIMIT`, `TRACK_BACKGROUND_SESSIONS` | – | Scheduler limit, picker size, background notices. |
 | `DB_PATH`, `STATUS_FILE`, `LOG_LEVEL` | – | Storage + logging. |
 
 > **`ALLOWED_USERS` must be the stable user ID** (the login, e.g. `jdoe`), **not
@@ -89,19 +95,36 @@ opencode-talk-bridge            # or: python -m opencode_talk_bridge
 
 ### Commands (in Talk)
 
-Send any message to prompt OpenCode. Slash-commands:
+Send any message (or a **voice note** / **file**) to prompt OpenCode. The reply
+**streams live** into one message as it is generated. Slash-commands:
 
 | Command | Effect |
 | --- | --- |
 | `/new` | Start a fresh OpenCode session for this conversation. |
 | `/session` | Show the current session id. |
-| `/model [providerID/modelID]` | Show or set the model for this conversation. |
+| `/sessions` | List & switch recent sessions. |
+| `/rename <title>` | Rename the current session. |
+| `/detach` | Detach from the current session. |
+| `/messages` | Browse messages, then **revert** or **fork**. |
+| `/model [providerID/modelID]` | Show, pick, or set the model. |
+| `/agent [name]` | Show, pick, or set the agent (e.g. plan/build). |
+| `/projects` | Switch the OpenCode project. |
+| `/worktree` | Switch the git worktree. |
+| `/commands` | Browse & run custom OpenCode commands. |
+| `/mcps` | Enable/disable MCP servers. |
+| `/tts` | Toggle spoken (audio) replies (needs `TTS_*` + `SHARE_WEBDAV_DIR`). |
+| `/task <min> <prompt>` | Schedule a task (`/task every <min> …` to repeat). |
+| `/tasklist` | List & delete scheduled tasks. |
 | `/stop` | Abort the current run. |
 | `/status` | Show bridge & OpenCode health. |
 | `/help` | List commands. |
 
-When OpenCode asks permission for a dangerous action, reply **`ja`/`yes`** (allow
-once), **`immer`/`always`** (allow for this session), or **`nein`/`no`** (deny).
+**No inline buttons** on Talk → every picker is a **numbered list**: reply with
+the number. When OpenCode asks **permission** for a dangerous action, reply
+**`ja`** (allow once), **`immer`** (allow for this session), or **`nein`** (deny);
+agent **questions** are answered by their option number or free text.
+
+Set `BOT_LOCALE=en` for English UI strings (default `de`).
 
 ## Run under launchd (macOS)
 

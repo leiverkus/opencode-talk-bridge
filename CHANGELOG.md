@@ -6,6 +6,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-05-31
+
+Feature-parity push toward `grinev/opencode-telegram-bot`, adapted to Talk.
+
 ### Added
 - **Live response streaming**: the assistant reply is streamed into a single
   Talk message via editing (`PUT`, throttled by `STREAM_THROTTLE_MS`), instead
@@ -82,6 +86,7 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/leiverkus/opencode-talk-bridge/releases/tag/v0.1.0
