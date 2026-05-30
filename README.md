@@ -50,13 +50,37 @@ Nextcloud Talk  ──long-poll──▶  bridge  ──HTTP──▶  opencode 
 
 ## Install
 
+**One command** — installs the `opencode-talk-bridge` CLI into an isolated
+environment and onto your `PATH` ([uv](https://docs.astral.sh/uv/) or
+[pipx](https://pipx.pypa.io/)):
+
+```bash
+uv tool install git+https://github.com/leiverkus/opencode-talk-bridge.git
+# or:  pipx install git+https://github.com/leiverkus/opencode-talk-bridge.git
+```
+
+Then grab the env template and run from wherever you keep it:
+
+```bash
+curl -O https://raw.githubusercontent.com/leiverkus/opencode-talk-bridge/main/.env.example
+mv .env.example .env            # then edit .env
+opencode-talk-bridge --check    # validate config + OpenCode health
+opencode-talk-bridge            # run (reads ./.env, or pass --env-file PATH)
+```
+
+Upgrade with `uv tool upgrade opencode-talk-bridge` (or `pipx upgrade …`).
+
+<details>
+<summary>From source (for development)</summary>
+
 ```bash
 git clone https://github.com/leiverkus/opencode-talk-bridge.git
 cd opencode-talk-bridge
 python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"        # drop [dev] for a runtime-only install
-cp .env.example .env           # then edit .env
+pip install -e ".[dev]"         # editable + test/lint tools
+cp .env.example .env            # then edit .env
 ```
+</details>
 
 The OCS client lives in a separate repo and is pulled in as a **pinned git
 dependency** (`nextcloud-talk-core @ …@core-v1.0.0`); the repo is public, so the

@@ -21,14 +21,17 @@
 
     <key>ProgramArguments</key>
     <array>
-        <!-- Absolute path to the venv's console script (or python -m). -->
-        <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge/.venv/bin/opencode-talk-bridge</string>
+        <!-- Absolute path to the console script. For `uv tool install` this is
+             ~/.local/bin/opencode-talk-bridge; for a venv it is .venv/bin/…
+             Run `which opencode-talk-bridge` to confirm. -->
+        <string>/Users/patrick/.local/bin/opencode-talk-bridge</string>
         <string>--env-file</string>
-        <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge/.env</string>
+        <string>/Users/patrick/.config/opencode-talk-bridge/.env</string>
     </array>
 
+    <!-- Where the SQLite db / status file are written; keep your .env here too. -->
     <key>WorkingDirectory</key>
-    <string>/Users/patrick/Documents/Aktuell/opencode-talk-bridge</string>
+    <string>/Users/patrick/.config/opencode-talk-bridge</string>
 
     <key>RunAtLoad</key>
     <true/>
