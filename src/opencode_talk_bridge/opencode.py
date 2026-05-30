@@ -31,6 +31,9 @@ import httpx
 # Permission reply outcomes accepted by POST /permission/{id}/reply.
 PERMISSION_REPLIES = ("once", "always", "reject")
 
+# Sentinel: "use the client's configured directory" vs an explicit per-call one.
+_DEFAULT_DIR = object()
+
 
 class OpenCodeError(Exception):
     """Base error for OpenCode HTTP interactions."""
@@ -155,11 +158,12 @@ class OpenCodeClient:
 
     # --- sessions ----------------------------------------------------------
 
-    def create_session(self, title: str | None = None) -> str:
+    def create_session(self, title: str | None = None, directory: str | None = None) -> str:
         body: dict[str, Any] = {}
         if title:
             body["title"] = title
-        data = self._post("/session", body)
+        # None -> use the client's configured directory; a path overrides it.
+        data = self._post("/session", body, directory=directory or _DEFAULT_DIR)
         session_id = data.get("id")
         if not session_id:
             raise OpenCodeError(f"session create returned no id: {data!r}")
@@ -319,12 +323,26 @@ class OpenCodeClient:
             raise OpenCodeDownError(f"GET {path} failed: {exc}") from exc
         return self._unwrap(resp, path)
 
-    def _post(self, path: str, body: dict[str, Any], *, timeout: float | None = None) -> Any:
+    def _post(
+        self,
+        path: str,
+        body: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        directory: str | None | object = _DEFAULT_DIR,
+    ) -> Any:
+        # directory=_DEFAULT_DIR -> use the client's configured directory;
+        # an explicit value (or None) overrides it for this call.
+        params = (
+            self._dir_params()
+            if directory is _DEFAULT_DIR
+            else ({"directory": directory} if directory else None)
+        )
         try:
             resp = self._client.post(
                 path,
                 json=body,
-                params=self._dir_params(),
+                params=params,
                 timeout=httpx.USE_CLIENT_DEFAULT if timeout is None else timeout,
             )
         except httpx.TransportError as exc:

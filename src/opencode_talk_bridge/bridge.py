@@ -36,6 +36,7 @@ from .events import (
     ToolEvent,
     classify,
 )
+from .messages import translator
 from .opencode import OpenCodeClient, OpenCodeDownError, PermissionAsk, PromptResult, QuestionAsk
 from .pending import (
     PendingRegistry,
@@ -54,10 +55,6 @@ from .streaming import StreamState
 from .talk import IncomingMessage, NextcloudTalkError, TalkGateway, WebDavError
 
 log = logging.getLogger(__name__)
-
-_WORKING_NOTICE = "🔧 OpenCode arbeitet …"
-_BUSY_NOTICE = "⏳ Ich arbeite noch an der vorherigen Anfrage – bitte warten oder `/stop`."
-_DOWN_NOTICE = "⚠️ OpenCode ist nicht erreichbar. Bitte den Server prüfen."
 
 _TOOL_EMOJI = {
     "bash": "💻",
@@ -89,6 +86,7 @@ class Bridge:
         self._status = status
         self._allow = Allowlist(config.allowed_users)
         self._pending = PendingRegistry()
+        self._t = translator(config.bot_locale)
 
         self._stop = threading.Event()
         self._lock = threading.Lock()
@@ -223,10 +221,12 @@ class Bridge:
     def _answer_permission(self, token: str, ask: PermissionAsk, outcome: str) -> None:
         try:
             self._oc.reply_permission(ask.request_id, outcome)
-            label = {"once": "erlaubt (einmal)", "always": "erlaubt (immer)", "reject": "abgelehnt"}[outcome]
-            self._say(token, f"🔐 {label}.")
+            self._say(
+                token,
+                self._t({"once": "perm_once", "always": "perm_always", "reject": "perm_reject"}[outcome]),
+            )
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
 
     def _answer_question(self, token: str, ask: QuestionAsk, text: str) -> bool:
         answer: str | None = None
@@ -245,21 +245,29 @@ class Bridge:
         self._pending.pop(token)
         try:
             self._oc.reply_question(ask.request_id, answer)
-            self._say(token, f"✅ {answer}")
+            self._say(token, self._t("answered", answer=answer))
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
         return True
 
     # --- commands ----------------------------------------------------------
 
     def _handle_command(self, token: str, cmd: commands.Command) -> None:
         handlers = {
-            "help": lambda: self._say(token, commands.HELP_TEXT),
+            "help": lambda: self._say(token, self._t("help")),
             "new": lambda: self._cmd_new(token),
             "session": lambda: self._cmd_session(token),
             "sessions": lambda: self._cmd_sessions(token),
             "model": lambda: self._handle_model(token, cmd.arg),
             "agent": lambda: self._handle_agent(token, cmd.arg),
+            "projects": lambda: self._cmd_projects(token),
+            "worktree": lambda: self._cmd_worktree(token),
+            "messages": lambda: self._cmd_messages(token),
+            "commands": lambda: self._cmd_commands(token),
+            "mcps": lambda: self._cmd_mcps(token),
+            "rename": lambda: self._cmd_rename(token, cmd.arg),
+            "detach": lambda: self._cmd_detach(token),
+            "tts": lambda: self._cmd_tts(token),
             "stop": lambda: self._handle_stop(token),
             "status": lambda: self._handle_status(token),
         }
@@ -269,21 +277,21 @@ class Bridge:
 
     def _cmd_new(self, token: str) -> None:
         self._store.clear_session(token, now=_now())
-        self._say(token, "🆕 Neue OpenCode-Session beim nächsten Prompt.")
+        self._say(token, self._t("new_session"))
 
     def _cmd_session(self, token: str) -> None:
         sid = self._store.session_id_for(token)
-        self._say(token, f"Session: `{sid}`" if sid else "Noch keine Session.")
+        self._say(token, self._t("session_is", sid=sid) if sid else self._t("no_session_yet"))
 
     def _cmd_sessions(self, token: str) -> None:
         try:
             sessions = self._oc.list_sessions()
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
             return
         sessions = sessions[: self._cfg.list_limit]
         if not sessions:
-            self._say(token, "Keine Sessions vorhanden. Schreib einfach einen Prompt.")
+            self._say(token, self._t("no_sessions"))
             return
         items = [
             SelectItem(
@@ -292,140 +300,306 @@ class Bridge:
             for s in sessions
             if s.get("id")
         ]
-        self._offer_selection(token, "🗂 Sessions:", items, lambda sid: self._switch_session(token, sid))
+        self._offer_selection(
+            token, self._t("title_sessions"), items, lambda sid: self._switch_session(token, sid)
+        )
 
     def _switch_session(self, token: str, session_id: str) -> None:
         self._store.set_session(token, session_id, now=_now())
         with self._lock:
             self._session_to_token[session_id] = token
-        self._say(token, f"✅ Session gewechselt: `{session_id}`")
+        self._say(token, self._t("session_switched", sid=session_id))
+
+    def _cmd_rename(self, token: str, arg: str) -> None:
+        sid = self._store.session_id_for(token)
+        if not sid:
+            self._say(token, self._t("no_session_rename"))
+            return
+        if not arg:
+            self._say(token, self._t("rename_usage"))
+            return
+        try:
+            self._oc.rename_session(sid, arg.strip())
+            self._say(token, self._t("renamed", title=arg.strip()))
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+
+    def _cmd_detach(self, token: str) -> None:
+        self._store.clear_session(token, now=_now())
+        self._say(token, self._t("detached"))
+
+    def _cmd_tts(self, token: str) -> None:
+        if not (self._cfg.tts_url and self._cfg.tts_key):
+            self._say(token, self._t("tts_unconfigured"))
+            return
+        state = self._store.get(token)
+        new_value = not (state.tts_enabled if state else False)
+        self._store.set_tts(token, new_value, now=_now())
+        self._say(token, self._t("tts_on" if new_value else "tts_off"))
+
+    def _cmd_projects(self, token: str) -> None:
+        try:
+            projects = self._oc.list_projects()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        items = [
+            SelectItem(label=(p.get("name") or p.get("worktree", "?")), value=p.get("worktree", ""))
+            for p in projects[: self._cfg.list_limit]
+            if p.get("worktree")
+        ]
+        if not items:
+            self._say(token, self._t("no_projects"))
+            return
+        self._offer_selection(
+            token, self._t("title_projects"), items, lambda d: self._switch_directory(token, d, "project")
+        )
+
+    def _cmd_worktree(self, token: str) -> None:
+        try:
+            worktrees = self._oc.list_worktrees()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        items = [SelectItem(label=w, value=w) for w in worktrees[: self._cfg.list_limit]]
+        if not items:
+            self._say(token, self._t("no_worktrees"))
+            return
+        self._offer_selection(
+            token, self._t("title_worktrees"), items, lambda d: self._switch_directory(token, d, "worktree")
+        )
+
+    def _switch_directory(self, token: str, directory: str, kind: str) -> None:
+        # Switching project/worktree binds future sessions to a new directory;
+        # drop the current session so the next prompt creates one there.
+        self._store.set_directory(token, directory, now=_now())
+        self._store.clear_session(token, now=_now())
+        label = self._t("title_projects" if kind == "project" else "title_worktrees").strip(": 📁🌿")
+        self._say(token, self._t("dir_switched", kind=label, directory=directory))
+
+    def _cmd_commands(self, token: str) -> None:
+        try:
+            cmds = self._oc.list_commands()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        items = [
+            SelectItem(label=c["name"], value=c["name"], description=(c.get("description") or "")[:40])
+            for c in cmds[: self._cfg.list_limit]
+            if c.get("name")
+        ]
+        if not items:
+            self._say(token, self._t("no_commands"))
+            return
+        self._offer_selection(
+            token, self._t("title_commands"), items, lambda name: self._run_command(token, name)
+        )
+
+    def _run_command(self, token: str, name: str) -> None:
+        self._start_command(token, name)
+
+    def _cmd_mcps(self, token: str) -> None:
+        try:
+            mcps = self._oc.list_mcps()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        names = list(mcps.keys())[: self._cfg.list_limit]
+        if not names:
+            self._say(token, self._t("no_mcps"))
+            return
+        items = [SelectItem(label=n, value=n) for n in names]
+        self._offer_selection(token, self._t("title_mcps"), items, lambda n: self._toggle_mcp(token, n, mcps))
+
+    def _toggle_mcp(self, token: str, name: str, mcps: dict) -> None:
+        cfg = mcps.get(name) or {}
+        currently = bool(cfg.get("enabled", True)) if isinstance(cfg, dict) else True
+        try:
+            self._oc.toggle_mcp(name, not currently)
+            state = self._t("mcp_off" if currently else "mcp_on")
+            self._say(token, self._t("mcp_toggled", name=name, state=state))
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+
+    def _cmd_messages(self, token: str) -> None:
+        sid = self._store.session_id_for(token)
+        if not sid:
+            self._say(token, self._t("no_session"))
+            return
+        try:
+            messages = self._oc.session_messages(sid)
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+            return
+        user_msgs = [
+            m
+            for m in messages
+            if (m.get("info") or {}).get("role") == "user" and (m.get("info") or {}).get("id")
+        ]
+        user_msgs = user_msgs[-self._cfg.list_limit :]
+        if not user_msgs:
+            self._say(token, self._t("no_messages"))
+            return
+        items = [SelectItem(label=_message_label(m), value=(m["info"]["id"])) for m in user_msgs]
+        self._offer_selection(
+            token, self._t("title_messages"), items, lambda mid: self._offer_revert_fork(token, sid, mid)
+        )
+
+    def _offer_revert_fork(self, token: str, session_id: str, message_id: str) -> None:
+        items = [
+            SelectItem(label=self._t("action_revert"), value="revert"),
+            SelectItem(label=self._t("action_fork"), value="fork"),
+        ]
+        self._offer_selection(
+            token,
+            self._t("title_action"),
+            items,
+            lambda action: self._do_revert_fork(token, session_id, message_id, action),
+        )
+
+    def _do_revert_fork(self, token: str, session_id: str, message_id: str, action: str) -> None:
+        try:
+            if action == "revert":
+                self._oc.revert(session_id, message_id)
+                self._say(token, self._t("reverted"))
+            else:
+                new_id = self._oc.fork(session_id, message_id)
+                self._switch_session(token, new_id)
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
 
     def _handle_model(self, token: str, arg: str) -> None:
         if arg:
             if "/" not in arg:
-                self._say(token, "Format: `/model providerID/modelID`")
+                self._say(token, self._t("model_format"))
                 return
             self._store.set_model(token, arg, now=_now())
-            self._say(token, f"✅ Modell gesetzt: `{arg}`")
+            self._say(token, self._t("model_set", model=arg))
             return
         try:
             models = self._oc.list_models()
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
             return
         if not models:
-            current = (self._store.get(token).model if self._store.get(token) else None) or "(Server-Default)"
-            self._say(token, f"Aktuelles Modell: `{current}`\nSetzen: `/model providerID/modelID`")
+            current = (self._store.get(token).model if self._store.get(token) else None) or "(default)"
+            self._say(token, self._t("model_current", model=current))
             return
         items = [
             SelectItem(label=f"{m['providerID']}/{m['id']}", value=f"{m['providerID']}/{m['id']}")
             for m in models[: self._cfg.list_limit]
             if m.get("providerID") and m.get("id")
         ]
-        self._offer_selection(token, "🧠 Modelle:", items, lambda v: self._set_model(token, v))
+        self._offer_selection(token, self._t("title_models"), items, lambda v: self._set_model(token, v))
 
     def _set_model(self, token: str, value: str) -> None:
         self._store.set_model(token, value, now=_now())
-        self._say(token, f"✅ Modell gesetzt: `{value}`")
+        self._say(token, self._t("model_set", model=value))
 
     def _handle_agent(self, token: str, arg: str) -> None:
         if arg:
             self._store.set_agent(token, arg.strip(), now=_now())
-            self._say(token, f"✅ Agent gesetzt: `{arg.strip()}`")
+            self._say(token, self._t("agent_set", agent=arg.strip()))
             return
         try:
             agents = self._oc.list_agents()
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
             return
         visible = [a for a in agents if not a.get("hidden") and a.get("name")]
         if not visible:
-            self._say(token, "Keine Agenten verfügbar. Setzen: `/agent <name>`")
+            self._say(token, self._t("no_agents"))
             return
         items = [
             SelectItem(label=a["name"], value=a["name"], description=(a.get("description") or "")[:40])
             for a in visible[: self._cfg.list_limit]
         ]
-        self._offer_selection(token, "🎭 Agenten:", items, lambda v: self._set_agent(token, v))
+        self._offer_selection(token, self._t("title_agents"), items, lambda v: self._set_agent(token, v))
 
     def _set_agent(self, token: str, value: str) -> None:
         self._store.set_agent(token, value, now=_now())
-        self._say(token, f"✅ Agent gesetzt: `{value}`")
+        self._say(token, self._t("agent_set", agent=value))
 
     def _offer_selection(self, token: str, title: str, items: list[SelectItem], on_select) -> None:
         if not items:
-            self._say(token, "Nichts zur Auswahl.")
+            self._say(token, self._t("nothing_to_pick"))
             return
         self._pending.set(token, SelectionPending(title=title, items=items, on_select=on_select))
-        self._say(token, format_selection(title, items))
+        self._say(token, format_selection(title, items, hint=self._t("pick_number")))
 
     def _handle_stop(self, token: str) -> None:
         sid = self._store.session_id_for(token)
         if not sid:
-            self._say(token, "Keine laufende Session.")
+            self._say(token, self._t("no_running_session"))
             return
         try:
             self._oc.abort(sid)
-            self._say(token, "🛑 Abgebrochen.")
+            self._say(token, self._t("aborted"))
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
 
     def _handle_status(self, token: str) -> None:
         healthy = self._oc.health()
         sid = self._store.session_id_for(token)
         state = self._store.get(token)
-        model = (state.model if state else None) or self._cfg.opencode_model or "(Server-Default)"
-        agent = (state.agent if state else None) or "(Default)"
-        self._say(
-            token,
-            f"📊 OpenCode: {'✅ erreichbar' if healthy else '⚠️ nicht erreichbar'}\n"
-            f"Session: `{sid or '—'}`\nModell: `{model}`\nAgent: `{agent}`",
-        )
+        model = (state.model if state else None) or self._cfg.opencode_model or "(default)"
+        agent = (state.agent if state else None) or "(default)"
+        health = self._t("reachable") if healthy else self._t("unreachable")
+        self._say(token, self._t("status", health=health, sid=sid or "—", model=model, agent=agent))
         self._status.update(opencode_healthy=healthy)
 
     # --- prompting ---------------------------------------------------------
 
     def _start_prompt(self, token: str, text: str) -> None:
+        self._start_turn(token, lambda sid: self._prompt_runner(token, sid, text))
+
+    def _start_command(self, token: str, name: str) -> None:
+        self._start_turn(token, lambda sid: self._oc.run_command(sid, name))
+
+    def _prompt_runner(self, token: str, session_id: str, text: str) -> PromptResult:
+        state = self._store.get(token)
+        model = (state.model if state else None) or self._cfg.opencode_model
+        agent = state.agent if state else None
+        return self._oc.prompt(session_id, text, model=model, agent=agent)
+
+    def _start_turn(self, token: str, runner) -> None:
         with self._lock:
             worker = self._busy.get(token)
             if worker is not None and worker.is_alive():
-                self._say(token, _BUSY_NOTICE)
+                self._say(token, self._t("busy"))
                 return
             t = threading.Thread(
-                target=self._run_prompt, args=(token, text), name=f"prompt:{token}", daemon=True
+                target=self._run_turn, args=(token, runner), name=f"turn:{token}", daemon=True
             )
             self._busy[token] = t
             t.start()
 
-    def _run_prompt(self, token: str, text: str) -> None:
+    def _run_turn(self, token: str, runner) -> None:
         try:
             session_id = self._ensure_session(token)
         except OpenCodeDownError:
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
             self._status.update(state="opencode_down", opencode_healthy=False)
             return
         except Exception as exc:  # noqa: BLE001 - report any setup failure to the user
             log.exception("session setup failed")
-            self._say(token, f"⚠️ Fehler: {exc}")
+            self._say(token, self._t("error", error=exc))
             return
 
         self._status.update(state="working")
-        msg_id = self._say(token, _WORKING_NOTICE)
+        msg_id = self._say(token, self._t("working"))
         stream = self._begin_turn(session_id, token, msg_id)
-        state = self._store.get(token)
-        model = (state.model if state else None) or self._cfg.opencode_model
-        agent = state.agent if state else None
 
         try:
-            result = self._oc.prompt(session_id, text, model=model, agent=agent)
+            result = runner(session_id)
         except OpenCodeDownError:
             self._end_turn(session_id)
-            self._say(token, _DOWN_NOTICE)
+            self._say(token, self._t("down"))
             self._status.update(state="opencode_down", opencode_healthy=False)
             return
         except Exception as exc:  # noqa: BLE001
             log.exception("prompt failed")
-            self._finalize_or_say(token, stream, f"⚠️ Fehler: {exc}")
+            self._finalize_or_say(token, stream, self._t("error", error=exc))
             self._end_turn(session_id)
             self._status.update(state="polling")
             return
@@ -439,7 +613,9 @@ class Bridge:
         sid = self._store.session_id_for(token)
         if sid:
             return sid
-        sid = self._oc.create_session(title=f"Talk {token}")
+        state = self._store.get(token)
+        directory = state.directory if state else None
+        sid = self._oc.create_session(title=f"Talk {token}", directory=directory)
         self._store.set_session(token, sid, now=_now())
         with self._lock:
             self._session_to_token[sid] = token
@@ -465,14 +641,14 @@ class Bridge:
 
     def _deliver(self, token: str, result: PromptResult, stream: StreamState | None) -> None:
         if result.aborted:
-            self._finalize_or_say(token, stream, "🛑 Abgebrochen.")
+            self._finalize_or_say(token, stream, self._t("aborted"))
             return
         if result.error:
-            self._finalize_or_say(token, stream, f"⚠️ {result.error}")
+            self._finalize_or_say(token, stream, self._t("error", error=result.error))
             return
-        text = result.text or "(keine Antwort)"
+        text = result.text or self._t("no_answer")
         if self._should_attach(text) and self._deliver_as_file(token, text):
-            self._finalize_or_say(token, stream, "📎 Antwort als Datei angehängt.")
+            self._finalize_or_say(token, stream, self._t("attached_as_file"))
             return
         self._finalize_or_say(token, stream, text)
 
@@ -538,9 +714,23 @@ class Bridge:
         elif isinstance(ev, SessionError):
             token = self._token_for_session(ev.session_id)
             if token:
-                self._say(token, "⚠️ OpenCode meldet einen Fehler.")
+                self._say(token, self._t("session_error"))
         elif isinstance(ev, SessionIdle):
-            pass  # turn completion is driven by the blocking prompt return
+            self._on_session_idle(ev.session_id)
+
+    def _on_session_idle(self, session_id: str) -> None:
+        # The foreground turn finishes via the blocking prompt return (it has an
+        # active announce-set). A mapped session going idle *without* an active
+        # turn is a background/detached completion worth a short notice.
+        if not self._cfg.track_background_sessions:
+            return
+        with self._lock:
+            is_foreground = session_id in self._announced
+        if is_foreground:
+            return
+        token = self._token_for_session(session_id)
+        if token:
+            self._say(token, self._t("bg_done"))
 
     def _on_text(self, ev: TextDelta) -> None:
         with self._lock:
@@ -556,7 +746,7 @@ class Bridge:
         token = self._token_for_session(ev.session_id)
         if token:
             emoji = _TOOL_EMOJI.get(ev.tool, "🔧")
-            self._say(token, f"{emoji} `{ev.tool}`")
+            self._say(token, f"{emoji} `{ev.tool}`")  # tool name is not localised
 
     def _on_reasoning(self, ev: ReasoningDelta) -> None:
         if self._cfg.hide_thinking:
@@ -565,7 +755,7 @@ class Bridge:
             return  # one thinking notice per turn
         token = self._token_for_session(ev.session_id)
         if token:
-            self._say(token, "💭 denkt nach …")
+            self._say(token, self._t("thinking"))
 
     def _announce_once(self, session_id: str, key: str) -> bool:
         """Return True the first time ``key`` is seen this turn (per session)."""
@@ -609,6 +799,16 @@ class Bridge:
         except NextcloudTalkError as exc:
             log.error("[%s] failed to post message: %s", token, exc)
             return None
+
+
+def _message_label(message: dict) -> str:
+    """Short label for a user message in the /messages picker."""
+    parts = message.get("parts") or []
+    for part in parts:
+        if isinstance(part, dict) and part.get("type") == "text" and part.get("text"):
+            text = part["text"].strip().replace("\n", " ")
+            return text[:50] + ("…" if len(text) > 50 else "")
+    return message.get("info", {}).get("id", "?")
 
 
 def _now() -> int:

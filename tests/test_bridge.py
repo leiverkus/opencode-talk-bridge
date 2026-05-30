@@ -51,19 +51,63 @@ class FakeOpenCode:
         self.sessions_list: list[dict] = []
         self.models_list: list[dict] = []
         self.agents_list: list[dict] = []
+        self.projects_list: list[dict] = []
+        self.worktrees_list: list[str] = []
+        self.commands_list: list[dict] = []
+        self.messages_list: list[dict] = []
+        self.mcps_dict: dict = {}
+        self.created_dirs: list = []
+        self.ran_commands: list[str] = []
+        self.renamed: list[tuple[str, str]] = []
+        self.reverted: list[tuple[str, str]] = []
+        self.toggled: list[tuple[str, bool]] = []
         self._sid = 0
 
     def health(self):
         return not self.down
 
-    def create_session(self, title=None):
+    def create_session(self, title=None, directory=None):
         self._sid += 1
+        self.created_dirs.append(directory)
         return f"ses_{self._sid}"
 
     def prompt(self, session_id, text, model=None, agent=None, extra_parts=None):
         if self.down:
             raise OpenCodeDownError("down")
         return self.result
+
+    def run_command(self, session_id, command, arguments=""):
+        self.ran_commands.append(command)
+        return self.result
+
+    def rename_session(self, session_id, title):
+        self.renamed.append((session_id, title))
+
+    def revert(self, session_id, message_id, part_id=None):
+        self.reverted.append((session_id, message_id))
+
+    def fork(self, session_id, message_id):
+        self._sid += 1
+        return f"ses_fork_{self._sid}"
+
+    def session_messages(self, session_id):
+        return self.messages_list
+
+    def list_projects(self):
+        return self.projects_list
+
+    def list_worktrees(self):
+        return self.worktrees_list
+
+    def list_commands(self):
+        return self.commands_list
+
+    def list_mcps(self):
+        return self.mcps_dict
+
+    def toggle_mcp(self, name, enable):
+        self.toggled.append((name, enable))
+        return True
 
     def abort(self, session_id):
         self.aborted.append(session_id)
@@ -331,6 +375,105 @@ def test_selection_non_number_falls_through(bridge):
     bridge._handle_message(TOKEN, _msg("do something else"))
     _join_workers(bridge)
     assert "done" in bridge.gw.sent
+
+
+# --- Phase 2: breadth commands --------------------------------------------
+
+
+def test_rename_session(bridge):
+    bridge.store.set_session(TOKEN, "ses_1", now=1)
+    bridge._handle_message(TOKEN, _msg("/rename My Project"))
+    assert bridge.oc.renamed == [("ses_1", "My Project")]
+
+
+def test_detach_clears_session(bridge):
+    bridge.store.set_session(TOKEN, "ses_1", now=1)
+    bridge._handle_message(TOKEN, _msg("/detach"))
+    assert bridge.store.session_id_for(TOKEN) is None
+
+
+def test_projects_switch_sets_directory_and_clears_session(bridge):
+    bridge.store.set_session(TOKEN, "ses_1", now=1)
+    bridge.oc.projects_list = [
+        {"name": "Repo A", "worktree": "/work/a"},
+        {"name": "Repo B", "worktree": "/work/b"},
+    ]
+    bridge._handle_message(TOKEN, _msg("/projects"))
+    bridge._handle_message(TOKEN, _msg("2"))
+    state = bridge.store.get(TOKEN)
+    assert state.directory == "/work/b"
+    assert state.opencode_session_id is None  # session dropped for the new project
+
+
+def test_new_session_uses_stored_directory(bridge):
+    bridge.store.set_directory(TOKEN, "/work/b", now=1)
+    bridge._handle_message(TOKEN, _msg("build something"))
+    _join_workers(bridge)
+    assert bridge.oc.created_dirs == ["/work/b"]
+
+
+def test_worktree_switch(bridge):
+    bridge.oc.worktrees_list = ["/wt/main", "/wt/feature"]
+    bridge._handle_message(TOKEN, _msg("/worktree"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    assert bridge.store.get(TOKEN).directory == "/wt/main"
+
+
+def test_commands_picker_runs_command(bridge):
+    bridge.oc.commands_list = [{"name": "review", "description": "review code"}]
+    bridge._handle_message(TOKEN, _msg("/commands"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    _join_workers(bridge)
+    assert bridge.oc.ran_commands == ["review"]
+
+
+def test_mcps_toggle(bridge):
+    bridge.oc.mcps_dict = {"zotero": {"enabled": True}}
+    bridge._handle_message(TOKEN, _msg("/mcps"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    assert bridge.oc.toggled == [("zotero", False)]  # was enabled -> disable
+
+
+def test_messages_revert_flow(bridge):
+    bridge.store.set_session(TOKEN, "ses_1", now=1)
+    bridge.oc.messages_list = [
+        {"info": {"id": "msg_1", "role": "user"}, "parts": [{"type": "text", "text": "first request"}]},
+    ]
+    bridge._handle_message(TOKEN, _msg("/messages"))
+    bridge._handle_message(TOKEN, _msg("1"))  # pick the message
+    bridge._handle_message(TOKEN, _msg("1"))  # pick "Revert"
+    assert bridge.oc.reverted == [("ses_1", "msg_1")]
+
+
+def test_tts_requires_config(bridge):
+    bridge._handle_message(TOKEN, _msg("/tts"))
+    assert any("nicht konfiguriert" in m for m in bridge.gw.sent)
+
+
+def test_tts_toggle_when_configured(bridge):
+    object.__setattr__(bridge._cfg, "tts_url", "http://tts")
+    object.__setattr__(bridge._cfg, "tts_key", "k")
+    bridge._handle_message(TOKEN, _msg("/tts"))
+    assert bridge.store.get(TOKEN).tts_enabled is True
+
+
+def test_background_session_notification(bridge):
+    # A mapped session going idle without an active turn -> background notice.
+    bridge.store.set_session(TOKEN, "ses_bg", now=1)
+    bridge._load_session_map()
+    from opencode_talk_bridge.events import SessionIdle
+
+    bridge._handle_event({"type": "session.idle", "properties": {"sessionID": "ses_bg"}})
+    assert any("Hintergrund" in m or "Background" in m for m in bridge.gw.sent)
+    assert isinstance(SessionIdle("x"), SessionIdle)
+
+
+def test_foreground_idle_no_notification(bridge):
+    bridge.store.set_session(TOKEN, "ses_fg", now=1)
+    bridge._load_session_map()
+    bridge._begin_turn("ses_fg", TOKEN, msg_id=None)  # active turn
+    bridge._handle_event({"type": "session.idle", "properties": {"sessionID": "ses_fg"}})
+    assert not any("Hintergrund" in m for m in bridge.gw.sent)
 
 
 def test_no_attachment_without_webdav_dir(bridge):

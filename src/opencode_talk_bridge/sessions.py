@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS conversations (
     opencode_session_id   TEXT,
     model                 TEXT,
     agent                 TEXT,
+    directory             TEXT,
     tts_enabled           INTEGER NOT NULL DEFAULT 0,
     last_known_message_id INTEGER NOT NULL DEFAULT 0,
     updated_at            INTEGER NOT NULL DEFAULT 0
@@ -26,6 +27,7 @@ CREATE TABLE IF NOT EXISTS conversations (
 # Columns added after 0.1.x; applied idempotently for existing databases.
 _MIGRATIONS = (
     "ALTER TABLE conversations ADD COLUMN agent TEXT",
+    "ALTER TABLE conversations ADD COLUMN directory TEXT",
     "ALTER TABLE conversations ADD COLUMN tts_enabled INTEGER NOT NULL DEFAULT 0",
 )
 
@@ -37,6 +39,7 @@ class ConversationState:
     model: str | None
     last_known_message_id: int
     agent: str | None = None
+    directory: str | None = None
     tts_enabled: bool = False
 
 
@@ -99,6 +102,9 @@ class SessionStore:
     def set_agent(self, token: str, agent: str | None, *, now: int = 0) -> None:
         self._upsert(token, "agent", agent, now)
 
+    def set_directory(self, token: str, directory: str | None, *, now: int = 0) -> None:
+        self._upsert(token, "directory", directory, now)
+
     def set_tts(self, token: str, enabled: bool, *, now: int = 0) -> None:
         self._upsert(token, "tts_enabled", 1 if enabled else 0, now)
 
@@ -130,5 +136,6 @@ def _row_to_state(row: sqlite3.Row) -> ConversationState:
         model=row["model"],
         last_known_message_id=row["last_known_message_id"],
         agent=row["agent"] if "agent" in keys else None,
+        directory=row["directory"] if "directory" in keys else None,
         tts_enabled=bool(row["tts_enabled"]) if "tts_enabled" in keys else False,
     )

@@ -19,6 +19,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - OpenCode client wrappers for sessions (rename/revert/unrevert/fork), projects,
   worktrees, models, agents, commands, MCP, and question reply/reject.
 
+- **Breadth commands** (Phase 2): `/rename`, `/detach`, `/projects`,
+  `/worktree`, `/commands` (run with streaming), `/mcps` (toggle), and
+  `/messages` → revert/fork. Projects/worktrees bind a per-conversation
+  directory for new sessions.
+- **Background-session notifications** when a non-foreground session goes idle
+  (`TRACK_BACKGROUND_SESSIONS`).
+- **i18n**: user-facing strings localised via `messages.py` (German + English),
+  selected by `BOT_LOCALE`.
+
 ### Changed
 - Internal refactor: unified pending-interaction registry (`pending.py`),
   streaming substrate (`streaming.py`), and typed SSE dispatch (`events.py`).

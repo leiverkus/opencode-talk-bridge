@@ -16,6 +16,14 @@ COMMANDS = (
     "sessions",
     "model",
     "agent",
+    "projects",
+    "worktree",
+    "messages",
+    "commands",
+    "mcps",
+    "rename",
+    "detach",
+    "tts",
     "stop",
     "status",
     "help",
@@ -44,19 +52,4 @@ def parse(message: str) -> Command | Prompt:
         return Command(name=name, arg=rest.strip())
     # Unknown slash-word: treat as a plain prompt rather than silently dropping.
     return Prompt(text=text)
-
-
-HELP_TEXT = (
-    "🤖 *opencode-talk-bridge*\n"
-    "Send any message to prompt OpenCode. Commands:\n"
-    "• `/new` — start a fresh OpenCode session\n"
-    "• `/session` — show the current session id\n"
-    "• `/sessions` — list & switch recent sessions\n"
-    "• `/model [providerID/modelID]` — show, pick, or set the model\n"
-    "• `/agent [name]` — show, pick, or set the agent (e.g. plan/build)\n"
-    "• `/stop` — abort the current run\n"
-    "• `/status` — show bridge & OpenCode health\n"
-    "• `/help` — this message\n"
-    "Pickers: reply with the number. Permission prompts: `ja` (once), "
-    "`immer` (always), `nein` (deny)."
-)
+# The help text is localised in messages.py (key "help"), not here.

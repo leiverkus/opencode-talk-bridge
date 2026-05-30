@@ -74,7 +74,7 @@ class PendingRegistry:
             return token in self._by_token
 
 
-def format_selection(title: str, items: list[SelectItem]) -> str:
+def format_selection(title: str, items: list[SelectItem], hint: str = "_Antworte mit der Nummer._") -> str:
     """Render a numbered picker. Reply with the number to choose."""
     lines = [title]
     for i, item in enumerate(items, 1):
@@ -82,7 +82,7 @@ def format_selection(title: str, items: list[SelectItem]) -> str:
         if item.description:
             line += f" — {item.description}"
         lines.append(line)
-    lines.append("_Antworte mit der Nummer._")
+    lines.append(hint)
     return "\n".join(lines)
 
 
