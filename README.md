@@ -175,6 +175,10 @@ pytest
 All tests use mocked HTTP for both Talk and OpenCode — no live calls. CI runs
 the matrix on Python 3.10–3.13.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT © Patrick Leiverkus
