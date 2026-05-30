@@ -19,6 +19,7 @@ Shared in-memory maps are guarded by ``self._lock``.
 
 from __future__ import annotations
 
+import base64
 import logging
 import threading
 import time
@@ -49,10 +50,13 @@ from .pending import (
     parse_choice,
 )
 from .permissions import format_prompt, interpret_reply
+from .scheduler import Scheduler, TaskStore
 from .sessions import SessionStore
 from .status import StatusWriter
 from .streaming import StreamState
-from .talk import IncomingMessage, NextcloudTalkError, TalkGateway, WebDavError
+from .stt import STTClient, STTError
+from .talk import FileRef, IncomingMessage, NextcloudTalkError, TalkGateway, WebDavError
+from .tts import TTSClient, TTSError
 
 log = logging.getLogger(__name__)
 
@@ -78,12 +82,20 @@ class Bridge:
         opencode: OpenCodeClient,
         store: SessionStore,
         status: StatusWriter,
+        *,
+        stt: STTClient | None = None,
+        tts: TTSClient | None = None,
+        task_store: TaskStore | None = None,
     ) -> None:
         self._cfg = config
         self._talk = gateway
         self._oc = opencode
         self._store = store
         self._status = status
+        self._stt = stt
+        self._tts = tts
+        self._task_store = task_store
+        self._scheduler: Scheduler | None = None
         self._allow = Allowlist(config.allowed_users)
         self._pending = PendingRegistry()
         self._t = translator(config.bot_locale)
@@ -109,6 +121,10 @@ class Bridge:
             state="polling", since=_now(), conversations=tokens, opencode_healthy=self._oc.health()
         )
 
+        if self._task_store is not None:
+            self._scheduler = Scheduler(self._task_store, self._run_scheduled)
+            self._scheduler.start()
+
         sse = threading.Thread(target=self._sse_loop, name="sse", daemon=True)
         sse.start()
         self._threads.append(sse)
@@ -127,8 +143,13 @@ class Bridge:
     def stop(self) -> None:
         log.info("stopping bridge")
         self._stop.set()
+        if self._scheduler is not None:
+            self._scheduler.stop()
         # Closing the OpenCode client breaks the blocking SSE stream.
         self._oc.close()
+
+    def _run_scheduled(self, token: str, prompt: str) -> None:
+        self._start_prompt(token, prompt)
 
     def _resolve_tokens(self) -> list[str]:
         if not self._cfg.watch_all:
@@ -193,8 +214,8 @@ class Bridge:
         parsed = commands.parse(msg.text)
         if isinstance(parsed, commands.Command):
             self._handle_command(token, parsed)
-        else:
-            self._start_prompt(token, parsed.text)
+        elif parsed.text or msg.files:
+            self._start_prompt(token, parsed.text, msg.files)
 
     # --- pending interaction resolution -----------------------------------
 
@@ -268,6 +289,8 @@ class Bridge:
             "rename": lambda: self._cmd_rename(token, cmd.arg),
             "detach": lambda: self._cmd_detach(token),
             "tts": lambda: self._cmd_tts(token),
+            "task": lambda: self._cmd_task(token, cmd.arg),
+            "tasklist": lambda: self._cmd_tasklist(token),
             "stop": lambda: self._handle_stop(token),
             "status": lambda: self._handle_status(token),
         }
@@ -336,6 +359,45 @@ class Bridge:
         new_value = not (state.tts_enabled if state else False)
         self._store.set_tts(token, new_value, now=_now())
         self._say(token, self._t("tts_on" if new_value else "tts_off"))
+
+    def _cmd_task(self, token: str, arg: str) -> None:
+        if self._task_store is None:
+            self._say(token, self._t("no_scheduler"))
+            return
+        parsed = _parse_task_arg(arg)
+        if parsed is None:
+            self._say(token, self._t("task_usage"))
+            return
+        run_in, interval, prompt = parsed
+        if self._task_store.count() >= self._cfg.task_limit:
+            self._say(token, self._t("task_limit", limit=self._cfg.task_limit))
+            return
+        now = _now()
+        self._task_store.add(token, prompt, now + run_in, interval, now=now)
+        self._say(token, self._t("task_created", minutes=run_in // 60))
+
+    def _cmd_tasklist(self, token: str) -> None:
+        if self._task_store is None:
+            self._say(token, self._t("no_scheduler"))
+            return
+        tasks = self._task_store.list(token)
+        if not tasks:
+            self._say(token, self._t("task_none"))
+            return
+        items = [
+            SelectItem(
+                label=(t.prompt[:40] + ("…" if len(t.prompt) > 40 else "")),
+                value=str(t.id),
+                description=("⟳" if t.interval_s else ""),
+            )
+            for t in tasks
+        ]
+        self._offer_selection(token, self._t("title_tasks"), items, lambda tid: self._delete_task(token, tid))
+
+    def _delete_task(self, token: str, task_id: str) -> None:
+        if self._task_store is not None:
+            self._task_store.delete(int(task_id))
+            self._say(token, self._t("task_deleted"))
 
     def _cmd_projects(self, token: str) -> None:
         try:
@@ -550,17 +612,40 @@ class Bridge:
 
     # --- prompting ---------------------------------------------------------
 
-    def _start_prompt(self, token: str, text: str) -> None:
-        self._start_turn(token, lambda sid: self._prompt_runner(token, sid, text))
+    def _start_prompt(self, token: str, text: str, files: tuple[FileRef, ...] = ()) -> None:
+        self._start_turn(token, lambda sid: self._prompt_runner(token, sid, text, files))
 
     def _start_command(self, token: str, name: str) -> None:
         self._start_turn(token, lambda sid: self._oc.run_command(sid, name))
 
-    def _prompt_runner(self, token: str, session_id: str, text: str) -> PromptResult:
+    def _prompt_runner(
+        self, token: str, session_id: str, text: str, files: tuple[FileRef, ...] = ()
+    ) -> PromptResult:
+        prompt_text, extra_parts = self._process_files(text, files)
         state = self._store.get(token)
         model = (state.model if state else None) or self._cfg.opencode_model
         agent = state.agent if state else None
-        return self._oc.prompt(session_id, text, model=model, agent=agent)
+        return self._oc.prompt(
+            session_id, prompt_text, model=model, agent=agent, extra_parts=extra_parts or None
+        )
+
+    def _process_files(self, text: str, files: tuple[FileRef, ...]) -> tuple[str, list[dict]]:
+        """Transcribe audio (STT) into the prompt and inline other files as
+        OpenCode file parts (base64 data URLs). Runs in the worker thread."""
+        prompt_text = text
+        extra_parts: list[dict] = []
+        for f in files:
+            try:
+                if f.is_audio and self._stt is not None:
+                    audio = self._talk.download(f.path)
+                    transcript = self._stt.transcribe(audio, f.name or "audio.ogg")
+                    prompt_text = f"{prompt_text} {transcript}".strip() if prompt_text else transcript
+                elif not f.is_audio:
+                    data = self._talk.download(f.path)
+                    extra_parts.append(_file_part(f, data))
+            except (STTError, WebDavError, NextcloudTalkError) as exc:
+                log.warning("could not process attachment %s: %s", f.name, exc)
+        return prompt_text, extra_parts
 
     def _start_turn(self, token: str, runner) -> None:
         with self._lock:
@@ -649,8 +734,25 @@ class Bridge:
         text = result.text or self._t("no_answer")
         if self._should_attach(text) and self._deliver_as_file(token, text):
             self._finalize_or_say(token, stream, self._t("attached_as_file"))
+        else:
+            self._finalize_or_say(token, stream, text)
+        self._maybe_tts(token, result.text)
+
+    def _maybe_tts(self, token: str, text: str) -> None:
+        """Synthesise the answer to audio and share it, if /tts is on for this
+        conversation and TTS + a share folder are configured."""
+        if self._tts is None or not text.strip():
             return
-        self._finalize_or_say(token, stream, text)
+        state = self._store.get(token)
+        if not (state and state.tts_enabled and self._cfg.share_webdav_dir):
+            return
+        try:
+            audio = self._tts.synthesize(text[:4000])
+            name = f"opencode-tts-{_now()}.mp3"
+            remote = self._cfg.share_webdav_dir.rstrip("/") + "/" + name
+            self._talk.upload_and_share(token, remote, audio, content_type="audio/mpeg")
+        except (TTSError, WebDavError, NextcloudTalkError) as exc:
+            log.warning("[%s] TTS failed: %s", token, exc)
 
     def _finalize_or_say(self, token: str, stream: StreamState | None, text: str) -> None:
         if stream is not None:
@@ -799,6 +901,34 @@ class Bridge:
         except NextcloudTalkError as exc:
             log.error("[%s] failed to post message: %s", token, exc)
             return None
+
+
+def _file_part(f: FileRef, data: bytes) -> dict:
+    """Build an OpenCode FilePartInput inlining the file as a base64 data URL."""
+    mime = f.mimetype or "application/octet-stream"
+    b64 = base64.b64encode(data).decode("ascii")
+    return {"type": "file", "mime": mime, "filename": f.name or "file", "url": f"data:{mime};base64,{b64}"}
+
+
+def _parse_task_arg(arg: str) -> tuple[int, int, str] | None:
+    """Parse `/task` args into (run_in_seconds, interval_seconds, prompt).
+
+    Forms: "<minutes> <prompt>" (one-shot) or "every <minutes> <prompt>".
+    Returns None if the syntax is invalid.
+    """
+    parts = arg.split(maxsplit=1)
+    if len(parts) < 2:
+        return None
+    head, rest = parts
+    if head.lower() in ("every", "alle"):
+        sub = rest.split(maxsplit=1)
+        if len(sub) < 2 or not sub[0].isdigit():
+            return None
+        minutes = int(sub[0])
+        return minutes * 60, minutes * 60, sub[1].strip()
+    if head.isdigit():
+        return int(head) * 60, 0, rest.strip()
+    return None
 
 
 def _message_label(message: dict) -> str:

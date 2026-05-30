@@ -87,6 +87,7 @@ class Config:
     tts_key: str | None
     tts_model: str
     tts_voice: str
+    task_limit: int
 
     poll_timeout: int = 30
     attachment_threshold: int = field(default=1500)
@@ -142,6 +143,7 @@ class Config:
             tts_key=_or_none(os.environ.get("TTS_API_KEY")),
             tts_model=os.environ.get("TTS_MODEL", "gpt-4o-mini-tts").strip(),
             tts_voice=os.environ.get("TTS_VOICE", "alloy").strip(),
+            task_limit=_int(os.environ.get("TASK_LIMIT"), 10),
         )
 
 

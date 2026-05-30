@@ -27,6 +27,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   (`TRACK_BACKGROUND_SESSIONS`).
 - **i18n**: user-facing strings localised via `messages.py` (German + English),
   selected by `BOT_LOCALE`.
+- **Voice & files** (Phase 3): incoming file/image attachments are inlined into
+  the prompt as OpenCode file parts; voice notes are transcribed (STT,
+  Whisper-compatible) into the prompt; optional spoken replies (TTS) shared as
+  audio, toggled per-conversation with `/tts`. Config: `STT_*`, `TTS_*`.
+- **Scheduled tasks** (Phase 3): `/task <min> <prompt>` (or `/task every <min>
+  …`) and `/tasklist`; a daemon scheduler fires due tasks, persisted in SQLite.
 
 ### Changed
 - Internal refactor: unified pending-interaction registry (`pending.py`),

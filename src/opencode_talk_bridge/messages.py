@@ -72,6 +72,14 @@ DE: dict[str, str] = {
     "tts_unconfigured": "TTS ist nicht konfiguriert (TTS_API_URL / TTS_API_KEY).",
     "tts_on": "🔊 Sprachausgabe aktiviert.",
     "tts_off": "🔊 Sprachausgabe deaktiviert.",
+    # scheduled tasks
+    "no_scheduler": "Geplante Aufgaben sind nicht aktiv.",
+    "task_usage": "Nutzung: /task <Minuten> <Prompt>  oder  /task every <Minuten> <Prompt>",
+    "task_limit": "Limit erreicht ({limit} Aufgaben). Erst eine löschen (/tasklist).",
+    "task_created": "⏰ Aufgabe geplant (in {minutes} min).",
+    "task_none": "Keine geplanten Aufgaben.",
+    "task_deleted": "🗑 Aufgabe gelöscht.",
+    "title_tasks": "⏰ Geplante Aufgaben:",
     # status
     "status": "📊 OpenCode: {health}\nSession: {sid}\nModell: {model}\nAgent: {agent}",
     "reachable": "✅ erreichbar",
@@ -92,6 +100,8 @@ DE: dict[str, str] = {
         "• /commands — eigene OpenCode-Commands ausführen\n"
         "• /mcps — MCP-Server aktivieren/deaktivieren\n"
         "• /tts — Sprachausgabe umschalten (falls konfiguriert)\n"
+        "• /task <Min> <Prompt> — Aufgabe planen (/task every <Min> … für wiederkehrend)\n"
+        "• /tasklist — geplante Aufgaben anzeigen/löschen\n"
         "• /stop — aktuellen Lauf abbrechen\n"
         "• /status — Bridge- & OpenCode-Status\n"
         "• /help — diese Nachricht\n"
@@ -157,6 +167,13 @@ EN: dict[str, str] = {
     "tts_unconfigured": "TTS is not configured (TTS_API_URL / TTS_API_KEY).",
     "tts_on": "🔊 Spoken replies enabled.",
     "tts_off": "🔊 Spoken replies disabled.",
+    "no_scheduler": "Scheduled tasks are not enabled.",
+    "task_usage": "Usage: /task <minutes> <prompt>  or  /task every <minutes> <prompt>",
+    "task_limit": "Limit reached ({limit} tasks). Delete one first (/tasklist).",
+    "task_created": "⏰ Task scheduled (in {minutes} min).",
+    "task_none": "No scheduled tasks.",
+    "task_deleted": "🗑 Task deleted.",
+    "title_tasks": "⏰ Scheduled tasks:",
     "status": "📊 OpenCode: {health}\nSession: {sid}\nModel: {model}\nAgent: {agent}",
     "reachable": "✅ reachable",
     "unreachable": "⚠️ unreachable",
@@ -176,6 +193,8 @@ EN: dict[str, str] = {
         "• /commands — browse & run custom OpenCode commands\n"
         "• /mcps — enable/disable MCP servers\n"
         "• /tts — toggle spoken replies (if configured)\n"
+        "• /task <min> <prompt> — schedule a task (/task every <min> … to repeat)\n"
+        "• /tasklist — list/delete scheduled tasks\n"
         "• /stop — abort the current run\n"
         "• /status — bridge & OpenCode health\n"
         "• /help — this message\n"

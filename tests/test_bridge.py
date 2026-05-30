@@ -35,6 +35,9 @@ class FakeGateway:
     def upload_and_share(self, token, remote_path, content, *, caption=None, content_type="text/markdown"):
         self.shared.append((remote_path, content, caption))
 
+    def download(self, path):
+        return b"FILEBYTES"
+
     def latest_message_id(self, token):
         return 0
 
@@ -61,6 +64,7 @@ class FakeOpenCode:
         self.renamed: list[tuple[str, str]] = []
         self.reverted: list[tuple[str, str]] = []
         self.toggled: list[tuple[str, bool]] = []
+        self.prompts: list[tuple] = []
         self._sid = 0
 
     def health(self):
@@ -74,6 +78,7 @@ class FakeOpenCode:
     def prompt(self, session_id, text, model=None, agent=None, extra_parts=None):
         if self.down:
             raise OpenCodeDownError("down")
+        self.prompts.append((text, extra_parts))
         return self.result
 
     def run_command(self, session_id, command, arguments=""):
@@ -474,6 +479,105 @@ def test_foreground_idle_no_notification(bridge):
     bridge._begin_turn("ses_fg", TOKEN, msg_id=None)  # active turn
     bridge._handle_event({"type": "session.idle", "properties": {"sessionID": "ses_fg"}})
     assert not any("Hintergrund" in m for m in bridge.gw.sent)
+
+
+# --- Phase 3: voice, files, scheduled tasks -------------------------------
+
+from opencode_talk_bridge.scheduler import TaskStore  # noqa: E402
+from opencode_talk_bridge.talk import FileRef  # noqa: E402
+
+
+class FakeSTT:
+    def transcribe(self, audio, filename="audio.ogg"):
+        return "transcribed prompt"
+
+
+class FakeTTS:
+    def __init__(self):
+        self.calls = []
+
+    def synthesize(self, text):
+        self.calls.append(text)
+        return b"AUDIO"
+
+
+def _audio_msg():
+    return IncomingMessage(
+        id=1,
+        actor_id="jdoe",
+        actor_type="users",
+        actor_display_name="jdoe",
+        text="",
+        timestamp=0,
+        is_system=False,
+        files=(FileRef("v.ogg", "/v.ogg", "audio/ogg"),),
+    )
+
+
+def _file_msg():
+    return IncomingMessage(
+        id=1,
+        actor_id="jdoe",
+        actor_type="users",
+        actor_display_name="jdoe",
+        text="review this",
+        timestamp=0,
+        is_system=False,
+        files=(FileRef("a.py", "/a.py", "text/x-python"),),
+    )
+
+
+def test_voice_input_transcribed_into_prompt(bridge):
+    bridge._stt = FakeSTT()
+    bridge._handle_message(TOKEN, _audio_msg())
+    _join_workers(bridge)
+    assert bridge.oc.prompts[-1][0] == "transcribed prompt"
+
+
+def test_file_input_becomes_part(bridge):
+    bridge._handle_message(TOKEN, _file_msg())
+    _join_workers(bridge)
+    text, extra_parts = bridge.oc.prompts[-1]
+    assert text == "review this"
+    assert extra_parts and extra_parts[0]["type"] == "file"
+    assert extra_parts[0]["url"].startswith("data:text/x-python;base64,")
+
+
+def test_tts_shares_audio_on_delivery(bridge):
+    object.__setattr__(bridge._cfg, "share_webdav_dir", "/Bridge")
+    bridge._tts = FakeTTS()
+    bridge.store.set_tts(TOKEN, True, now=1)
+    bridge._handle_message(TOKEN, _msg("say something"))
+    _join_workers(bridge)
+    assert bridge._tts.calls == ["done"]
+    assert any(p.endswith(".mp3") for p, _c, _cap in bridge.gw.shared)
+
+
+def test_task_create_and_list_delete(bridge, tmp_path):
+    bridge._task_store = TaskStore(str(tmp_path / "tasks.sqlite3"))
+    bridge._handle_message(TOKEN, _msg("/task 30 run the suite"))
+    assert bridge._task_store.count() == 1
+    bridge._handle_message(TOKEN, _msg("/tasklist"))
+    bridge._handle_message(TOKEN, _msg("1"))  # pick the task -> delete
+    assert bridge._task_store.count() == 0
+    bridge._task_store.close()
+
+
+def test_task_recurring_parse(bridge, tmp_path):
+    bridge._task_store = TaskStore(str(tmp_path / "tasks.sqlite3"))
+    bridge._handle_message(TOKEN, _msg("/task every 60 ping"))
+    task = bridge._task_store.list(TOKEN)[0]
+    assert task.interval_s == 3600
+    assert task.prompt == "ping"
+    bridge._task_store.close()
+
+
+def test_task_invalid_syntax(bridge, tmp_path):
+    bridge._task_store = TaskStore(str(tmp_path / "tasks.sqlite3"))
+    bridge._handle_message(TOKEN, _msg("/task nonsense"))
+    assert bridge._task_store.count() == 0
+    assert any("Nutzung" in m or "Usage" in m for m in bridge.gw.sent)
+    bridge._task_store.close()
 
 
 def test_no_attachment_without_webdav_dir(bridge):

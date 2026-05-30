@@ -24,6 +24,8 @@ COMMANDS = (
     "rename",
     "detach",
     "tts",
+    "task",
+    "tasklist",
     "stop",
     "status",
     "help",
@@ -52,4 +54,6 @@ def parse(message: str) -> Command | Prompt:
         return Command(name=name, arg=rest.strip())
     # Unknown slash-word: treat as a plain prompt rather than silently dropping.
     return Prompt(text=text)
+
+
 # The help text is localised in messages.py (key "help"), not here.

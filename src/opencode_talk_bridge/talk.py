@@ -28,6 +28,19 @@ from .webdav import WebDavClient, WebDavError
 
 
 @dataclass(frozen=True)
+class FileRef:
+    """A file shared into the conversation (WebDAV ``path`` + mime)."""
+
+    name: str
+    path: str
+    mimetype: str
+
+    @property
+    def is_audio(self) -> bool:
+        return self.mimetype.startswith("audio/")
+
+
+@dataclass(frozen=True)
 class IncomingMessage:
     id: int
     actor_id: str
@@ -36,9 +49,19 @@ class IncomingMessage:
     text: str
     timestamp: int
     is_system: bool
+    files: tuple[FileRef, ...] = ()
 
 
 def _parse_message(raw: dict[str, Any]) -> IncomingMessage:
+    files = tuple(
+        FileRef(
+            name=p.get("name", ""),
+            path=p.get("path", ""),
+            mimetype=p.get("mimetype", ""),
+        )
+        for p in (raw.get("messageParameters") or {}).values()
+        if isinstance(p, dict) and p.get("type") == "file" and p.get("path")
+    )
     return IncomingMessage(
         id=int(raw["id"]),
         actor_id=raw.get("actorId", ""),
@@ -47,6 +70,7 @@ def _parse_message(raw: dict[str, Any]) -> IncomingMessage:
         text=raw.get("message", ""),
         timestamp=int(raw.get("timestamp", 0)),
         is_system=raw.get("systemMessage", "") != "" or raw.get("messageType") == "system",
+        files=files,
     )
 
 
@@ -144,4 +168,4 @@ class TalkGateway:
         self._talk.share_file(token, path, caption=caption)
 
 
-__all__ = ["IncomingMessage", "TalkGateway", "NextcloudTalkError", "WebDavError"]
+__all__ = ["FileRef", "IncomingMessage", "TalkGateway", "NextcloudTalkError", "WebDavError"]

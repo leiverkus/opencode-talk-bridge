@@ -15,9 +15,12 @@ import sys
 from .bridge import Bridge
 from .config import Config, ConfigError, load_dotenv
 from .opencode import OpenCodeClient, wait_for_healthy
+from .scheduler import TaskStore
 from .sessions import SessionStore
 from .status import StatusWriter
+from .stt import STTClient
 from .talk import TalkGateway
+from .tts import TTSClient
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -64,7 +67,22 @@ def main(argv: list[str] | None = None) -> int:
 
     gateway = TalkGateway(config.talk)
     store = SessionStore(config.db_path)
-    bridge = Bridge(config, gateway, opencode, store, status)
+
+    stt = (
+        STTClient(
+            config.stt_url, api_key=config.stt_key, model=config.stt_model, language=config.stt_language
+        )
+        if config.stt_url
+        else None
+    )
+    tts = (
+        TTSClient(config.tts_url, api_key=config.tts_key, model=config.tts_model, voice=config.tts_voice)
+        if config.tts_url
+        else None
+    )
+    task_store = TaskStore(config.db_path)
+
+    bridge = Bridge(config, gateway, opencode, store, status, stt=stt, tts=tts, task_store=task_store)
 
     def _handle_signal(signum, _frame):
         log.info("received signal %s", signum)
@@ -78,7 +96,12 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         gateway.close()
         store.close()
+        task_store.close()
         opencode.close()
+        if stt:
+            stt.close()
+        if tts:
+            tts.close()
     return 0
 
 
