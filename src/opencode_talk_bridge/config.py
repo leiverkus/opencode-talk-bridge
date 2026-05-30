@@ -63,8 +63,10 @@ class Config:
 
     db_path: str
     status_file: str
-    share_dir: str | None
-    share_webdav_root: str | None
+    # WebDAV folder (relative to the Nextcloud user root) the bridge uploads
+    # code/long-output attachments into before sharing them. None disables
+    # attachments (long output is posted as text instead).
+    share_webdav_dir: str | None
     log_level: str
 
     poll_timeout: int = 30
@@ -104,8 +106,7 @@ class Config:
             opencode_model=_or_none(os.environ.get("OPENCODE_MODEL")),
             db_path=os.environ.get("DB_PATH", "bridge.sqlite3").strip(),
             status_file=os.environ.get("STATUS_FILE", "status.json").strip(),
-            share_dir=_or_none(os.environ.get("SHARE_DIR")),
-            share_webdav_root=_or_none(os.environ.get("SHARE_WEBDAV_ROOT")),
+            share_webdav_dir=_or_none(os.environ.get("SHARE_WEBDAV_DIR")),
             log_level=os.environ.get("LOG_LEVEL", "INFO").strip().upper(),
         )
 

@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+- File attachments now upload to Nextcloud directly via **WebDAV** (`PUT`,
+  creating the target folder on demand) before sharing into the conversation.
+  This removes the previous dependency on a desktop sync client having already
+  uploaded the file, which could make `share_file` fail with "not found".
+- Attachment config simplified to a single `SHARE_WEBDAV_DIR` (the server-side
+  folder), replacing `SHARE_DIR` + `SHARE_WEBDAV_ROOT`.
+
+### Added
+- `webdav.py`: minimal WebDAV client (reuses the app-password credentials).
+
 ## [0.1.0] - 2026-05-30
 
 Initial release.

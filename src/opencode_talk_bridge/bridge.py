@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from pathlib import Path
 
 from . import commands
 from .allowlist import Allowlist
@@ -28,7 +27,7 @@ from .opencode import OpenCodeClient, OpenCodeDownError, PromptResult
 from .permissions import PendingPermissions, format_prompt, interpret_reply
 from .sessions import SessionStore
 from .status import StatusWriter
-from .talk import IncomingMessage, NextcloudTalkError, TalkGateway
+from .talk import IncomingMessage, NextcloudTalkError, TalkGateway, WebDavError
 
 log = logging.getLogger(__name__)
 
@@ -290,20 +289,17 @@ class Bridge:
         return len(text) > self._cfg.attachment_threshold or text.count("```") >= 2
 
     def _deliver_as_file(self, token: str, text: str) -> bool:
-        """Write the answer to the Nextcloud share dir and share it. Returns
-        True on success; False if attachments are not configured/failed (caller
-        falls back to posting text)."""
-        if not (self._cfg.share_dir and self._cfg.share_webdav_root):
+        """Upload the answer to Nextcloud via WebDAV and share it into the
+        conversation. Returns True on success; False if attachments are not
+        configured or the upload/share failed (caller falls back to text)."""
+        if not self._cfg.share_webdav_dir:
             return False
         try:
             name = f"opencode-{_now()}.md"
-            local = Path(self._cfg.share_dir) / name
-            local.parent.mkdir(parents=True, exist_ok=True)
-            local.write_text(text, encoding="utf-8")
-            webdav_path = self._cfg.share_webdav_root.rstrip("/") + "/" + name
-            self._talk.share_file(token, webdav_path, caption="OpenCode-Antwort")
+            remote_path = self._cfg.share_webdav_dir.rstrip("/") + "/" + name
+            self._talk.upload_and_share(token, remote_path, text.encode("utf-8"), caption="OpenCode-Antwort")
             return True
-        except (OSError, NextcloudTalkError) as exc:
+        except (NextcloudTalkError, WebDavError) as exc:
             log.warning("[%s] file attachment failed, posting text: %s", token, exc)
             return False
 

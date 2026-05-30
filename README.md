@@ -69,7 +69,7 @@ Edit `.env` (see [`.env.example`](.env.example) for the full list):
 | `OPENCODE_USERNAME` / `OPENCODE_PASSWORD` | – | Basic-Auth if your OpenCode server is secured. |
 | `OPENCODE_DIRECTORY` | – | Workspace directory for OpenCode sessions. |
 | `OPENCODE_MODEL` | – | Default model `providerID/modelID`. |
-| `SHARE_DIR` / `SHARE_WEBDAV_ROOT` | – | Local sync folder + matching WebDAV path for file attachments. |
+| `SHARE_WEBDAV_DIR` | – | WebDAV folder (relative to user root) for code/long-output attachments. Created on demand; blank disables attachments. |
 | `DB_PATH`, `STATUS_FILE`, `LOG_LEVEL` | – | Storage + logging. |
 
 > **`ALLOWED_USERS` must be the stable user ID** (the login, e.g. `jdoe`), **not

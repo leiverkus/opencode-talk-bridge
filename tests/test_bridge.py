@@ -19,13 +19,13 @@ class FakeGateway:
 
     def __init__(self):
         self.sent: list[str] = []
-        self.shared: list[tuple[str, str]] = []
+        self.shared: list[tuple[str, bytes, str]] = []
 
     def send(self, token, text, reply_to=None):
         self.sent.append(text)
 
-    def share_file(self, token, path, caption=None):
-        self.shared.append((path, caption))
+    def upload_and_share(self, token, remote_path, content, *, caption=None, content_type="text/markdown"):
+        self.shared.append((remote_path, content, caption))
 
     def latest_message_id(self, token):
         return 0
@@ -171,17 +171,25 @@ def test_opencode_down_notice(bridge):
     assert any("nicht erreichbar" in m for m in bridge.gw.sent)
 
 
-def test_attachment_used_for_large_output(bridge, tmp_path):
-    share = tmp_path / "share"
+def test_attachment_used_for_large_output(bridge):
     # Config is a frozen dataclass; bypass for the test.
-    object.__setattr__(bridge._cfg, "share_dir", str(share))
-    object.__setattr__(bridge._cfg, "share_webdav_root", "/Bridge")
+    object.__setattr__(bridge._cfg, "share_webdav_dir", "/Bridge")
     bridge.oc.result = PromptResult(text="```\n" + "x" * 4000 + "\n```", aborted=False, error=None)
     bridge._handle_message(TOKEN, _msg("give me code"))
     _join_workers(bridge)
     assert len(bridge.gw.shared) == 1
-    path, caption = bridge.gw.shared[0]
+    path, content, caption = bridge.gw.shared[0]
     assert path.startswith("/Bridge/opencode-")
+    assert content.startswith(b"```")
+
+
+def test_no_attachment_without_webdav_dir(bridge):
+    # share_webdav_dir is unset by default -> long output posted as text.
+    bridge.oc.result = PromptResult(text="x" * 4000, aborted=False, error=None)
+    bridge._handle_message(TOKEN, _msg("give me lots"))
+    _join_workers(bridge)
+    assert bridge.gw.shared == []
+    assert any(len(m) > 3000 for m in bridge.gw.sent)
 
 
 def test_permission_asked_event_routes_to_conversation(bridge):

@@ -24,6 +24,8 @@ from nextcloud_talk_core import (
     TalkClient,
 )
 
+from .webdav import WebDavClient, WebDavError
+
 
 @dataclass(frozen=True)
 class IncomingMessage:
@@ -55,11 +57,13 @@ class TalkGateway:
         self._settings = settings
         self._talk = TalkClient(settings)
         self._ocs = OCSClient(settings)
+        self._webdav = WebDavClient(settings)
         self.own_user = settings.nc_user
 
     def close(self) -> None:
         self._talk.close()
         self._ocs.close()
+        self._webdav.close()
 
     def __enter__(self) -> TalkGateway:
         return self
@@ -114,8 +118,20 @@ class TalkGateway:
     def send(self, token: str, text: str, reply_to: int | None = None) -> None:
         self._talk.send_message(token, text, reply_to=reply_to)
 
-    def share_file(self, token: str, path: str, caption: str | None = None) -> None:
+    def upload_and_share(
+        self,
+        token: str,
+        remote_path: str,
+        content: bytes,
+        *,
+        caption: str | None = None,
+        content_type: str = "text/markdown",
+    ) -> None:
+        """Upload ``content`` to the server via WebDAV, then share it into the
+        conversation. Uploading first removes the dependency on a desktop sync
+        client having already pushed the file."""
+        path = self._webdav.upload(remote_path, content, content_type=content_type)
         self._talk.share_file(token, path, caption=caption)
 
 
-__all__ = ["IncomingMessage", "TalkGateway", "NextcloudTalkError"]
+__all__ = ["IncomingMessage", "TalkGateway", "NextcloudTalkError", "WebDavError"]
