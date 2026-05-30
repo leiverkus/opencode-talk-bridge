@@ -1,5 +1,11 @@
 # opencode-talk-bridge
 
+[![CI](https://github.com/leiverkus/opencode-talk-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/leiverkus/opencode-talk-bridge/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/leiverkus/opencode-talk-bridge?sort=semver)](https://github.com/leiverkus/opencode-talk-bridge/releases/latest)
+[![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](https://github.com/leiverkus/opencode-talk-bridge/blob/main/pyproject.toml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
 Drive a local [OpenCode](https://opencode.ai) coding agent from
 [Nextcloud Talk](https://nextcloud.com/talk/) — a self-hosted chat bridge.
 
