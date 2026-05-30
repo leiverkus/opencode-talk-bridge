@@ -10,7 +10,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 # Known slash-commands. Keep in sync with the help text and the README.
-COMMANDS = ("new", "session", "model", "stop", "status", "help")
+COMMANDS = (
+    "new",
+    "session",
+    "sessions",
+    "model",
+    "agent",
+    "stop",
+    "status",
+    "help",
+)
 
 
 @dataclass(frozen=True)
@@ -42,10 +51,12 @@ HELP_TEXT = (
     "Send any message to prompt OpenCode. Commands:\n"
     "• `/new` — start a fresh OpenCode session\n"
     "• `/session` — show the current session id\n"
-    "• `/model [providerID/modelID]` — show or set the model\n"
+    "• `/sessions` — list & switch recent sessions\n"
+    "• `/model [providerID/modelID]` — show, pick, or set the model\n"
+    "• `/agent [name]` — show, pick, or set the agent (e.g. plan/build)\n"
     "• `/stop` — abort the current run\n"
     "• `/status` — show bridge & OpenCode health\n"
     "• `/help` — this message\n"
-    "Permission prompts: reply `ja`/`yes` to allow once, `nein`/`no` to deny, "
-    "`immer`/`always` to allow for this session."
+    "Pickers: reply with the number. Permission prompts: `ja` (once), "
+    "`immer` (always), `nein` (deny)."
 )

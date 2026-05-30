@@ -50,6 +50,18 @@ class WebDavClient:
             raise WebDavError(f"PUT {path} -> HTTP {resp.status_code}: {resp.text[:200]}")
         return path
 
+    def download(self, remote_path: str) -> bytes:
+        """Download a file by its path relative to the user root."""
+        path = "/" + remote_path.strip("/")
+        url = self._base + _encode_path(path)
+        try:
+            resp = self._client.get(url)
+        except httpx.HTTPError as exc:
+            raise WebDavError(f"download {path} failed: {exc}") from exc
+        if resp.status_code >= 400:
+            raise WebDavError(f"GET {path} -> HTTP {resp.status_code}")
+        return resp.content
+
     def _put(self, url: str, content: bytes, content_type: str) -> httpx.Response:
         try:
             return self._client.request("PUT", url, content=content, headers={"Content-Type": content_type})

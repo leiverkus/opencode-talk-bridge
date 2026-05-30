@@ -7,6 +7,7 @@ import pytest
 from opencode_talk_bridge.bridge import Bridge
 from opencode_talk_bridge.config import Config
 from opencode_talk_bridge.opencode import OpenCodeDownError, PermissionAsk, PromptResult
+from opencode_talk_bridge.pending import PermissionPending
 from opencode_talk_bridge.sessions import SessionStore
 from opencode_talk_bridge.status import StatusWriter
 from opencode_talk_bridge.talk import IncomingMessage
@@ -19,10 +20,17 @@ class FakeGateway:
 
     def __init__(self):
         self.sent: list[str] = []
+        self.edited: list[tuple[int, str]] = []
         self.shared: list[tuple[str, bytes, str]] = []
+        self._mid = 0
 
     def send(self, token, text, reply_to=None):
         self.sent.append(text)
+        self._mid += 1
+        return self._mid
+
+    def edit(self, token, message_id, text):
+        self.edited.append((message_id, text))
 
     def upload_and_share(self, token, remote_path, content, *, caption=None, content_type="text/markdown"):
         self.shared.append((remote_path, content, caption))
@@ -40,6 +48,9 @@ class FakeOpenCode:
         self.replies: list[tuple[str, str]] = []
         self.down = False
         self.result = PromptResult(text="done", aborted=False, error=None)
+        self.sessions_list: list[dict] = []
+        self.models_list: list[dict] = []
+        self.agents_list: list[dict] = []
         self._sid = 0
 
     def health(self):
@@ -49,7 +60,7 @@ class FakeOpenCode:
         self._sid += 1
         return f"ses_{self._sid}"
 
-    def prompt(self, session_id, text, model=None):
+    def prompt(self, session_id, text, model=None, agent=None, extra_parts=None):
         if self.down:
             raise OpenCodeDownError("down")
         return self.result
@@ -64,6 +75,21 @@ class FakeOpenCode:
         self.replies.append((request_id, reply))
         return True
 
+    def reply_question(self, request_id, answer):
+        if self.down:
+            raise OpenCodeDownError("down")
+        self.replies.append((request_id, answer))
+        return True
+
+    def list_sessions(self):
+        return self.sessions_list
+
+    def list_models(self):
+        return self.models_list
+
+    def list_agents(self):
+        return self.agents_list
+
     def iter_events(self):
         return iter(())
 
@@ -75,6 +101,9 @@ class FakeOpenCode:
 def bridge(tmp_path, talk_env, monkeypatch):
     monkeypatch.setenv("ALLOWED_USERS", "jdoe")
     monkeypatch.setenv("TALK_CONVERSATIONS", TOKEN)
+    # Default to non-streaming so answers are posted (not edited); streaming has
+    # its own dedicated tests.
+    monkeypatch.setenv("RESPONSE_STREAMING", "false")
     cfg = Config.from_env()
     gw = FakeGateway()
     oc = FakeOpenCode()
@@ -145,19 +174,21 @@ def test_model_command_sets_model(bridge):
     assert bridge.store.get(TOKEN).model == "anthropic/claude"
 
 
-def test_permission_reply_path(bridge):
-    bridge._pending.set(
-        TOKEN, PermissionAsk.from_request({"id": "perm_1", "sessionID": "ses_1", "permission": "bash"})
+def _permission_pending(req_id="perm_1", session="ses_1"):
+    return PermissionPending(
+        PermissionAsk.from_request({"id": req_id, "sessionID": session, "permission": "bash"})
     )
+
+
+def test_permission_reply_path(bridge):
+    bridge._pending.set(TOKEN, _permission_pending())
     bridge._handle_message(TOKEN, _msg("ja"))
     assert bridge.oc.replies == [("perm_1", "once")]
     assert bridge._pending.has(TOKEN) is False
 
 
 def test_permission_non_reply_falls_through_to_prompt(bridge):
-    bridge._pending.set(
-        TOKEN, PermissionAsk.from_request({"id": "perm_1", "sessionID": "ses_1", "permission": "bash"})
-    )
+    bridge._pending.set(TOKEN, _permission_pending())
     bridge._handle_message(TOKEN, _msg("actually do something else"))
     _join_workers(bridge)
     assert bridge.oc.replies == []  # not interpreted as a permission answer
@@ -181,6 +212,125 @@ def test_attachment_used_for_large_output(bridge):
     path, content, caption = bridge.gw.shared[0]
     assert path.startswith("/Bridge/opencode-")
     assert content.startswith(b"```")
+
+
+# --- Phase 1: streaming, tool messages, question, pickers -----------------
+
+from opencode_talk_bridge.events import TextDelta, ToolEvent  # noqa: E402
+from opencode_talk_bridge.opencode import QuestionAsk  # noqa: E402
+from opencode_talk_bridge.pending import QuestionPending  # noqa: E402
+
+
+def _bind(bridge, session_id="ses_1"):
+    """Bind a session to the conversation and start a streamed turn.
+
+    Throttle is set to 0 so every delta edits deterministically (the stream
+    captures the throttle at construction time, so set it before _begin_turn).
+    """
+    bridge.store.set_session(TOKEN, session_id, now=1)
+    bridge._load_session_map()
+    object.__setattr__(bridge._cfg, "response_streaming", True)
+    object.__setattr__(bridge._cfg, "stream_throttle_ms", 0)
+    return bridge._begin_turn(session_id, TOKEN, msg_id=5)
+
+
+def test_streaming_text_delta_edits(bridge):
+    _bind(bridge)
+    bridge._on_text(TextDelta("ses_1", "msg_1", "p1", "Hello"))
+    bridge._on_text(TextDelta("ses_1", "msg_1", "p1", "Hello world"))
+    assert bridge.gw.edited[-1] == (5, "Hello world")
+
+
+def test_streaming_finalize_via_deliver(bridge):
+    stream = _bind(bridge)
+    bridge._deliver(TOKEN, PromptResult(text="final answer", aborted=False, error=None), stream)
+    assert bridge.gw.edited[-1] == (5, "final answer")
+
+
+def test_tool_message_announced_once(bridge):
+    _bind(bridge)
+    bridge._on_tool(ToolEvent("ses_1", "bash", "running", "c1"))
+    bridge._on_tool(ToolEvent("ses_1", "bash", "completed", "c1"))  # same call -> no repeat
+    bridge._on_tool(ToolEvent("ses_1", "read", "running", "c2"))
+    tool_msgs = [m for m in bridge.gw.sent if "`bash`" in m or "`read`" in m]
+    assert len(tool_msgs) == 2
+    assert any("💻" in m for m in tool_msgs)
+
+
+def test_tool_messages_hidden_when_configured(bridge):
+    object.__setattr__(bridge._cfg, "hide_tool_messages", True)
+    _bind(bridge)
+    bridge._on_tool(ToolEvent("ses_1", "bash", "running", "c1"))
+    assert not any("`bash`" in m for m in bridge.gw.sent)
+
+
+def _question_pending(options, custom=False):
+    return QuestionPending(
+        QuestionAsk.from_request(
+            {
+                "id": "q1",
+                "sessionID": "ses_1",
+                "questions": [
+                    {
+                        "question": "Which?",
+                        "header": "Choice",
+                        "options": [{"label": o, "description": ""} for o in options],
+                        "custom": custom,
+                    }
+                ],
+            }
+        )
+    )
+
+
+def test_question_answered_by_number(bridge):
+    bridge._pending.set(TOKEN, _question_pending(["Yes", "No"]))
+    bridge._handle_message(TOKEN, _msg("2"))
+    assert bridge.oc.replies == [("q1", "No")]
+    assert bridge._pending.has(TOKEN) is False
+
+
+def test_question_custom_free_text(bridge):
+    bridge._pending.set(TOKEN, _question_pending(["A"], custom=True))
+    bridge._handle_message(TOKEN, _msg("my own answer"))
+    assert bridge.oc.replies == [("q1", "my own answer")]
+
+
+def test_sessions_picker_switches(bridge):
+    bridge.oc.sessions_list = [{"id": "ses_a", "title": "Alpha"}, {"id": "ses_b", "title": "Beta"}]
+    bridge._handle_message(TOKEN, _msg("/sessions"))
+    assert bridge._pending.has(TOKEN) is True
+    bridge._handle_message(TOKEN, _msg("2"))
+    assert bridge.store.session_id_for(TOKEN) == "ses_b"
+    assert bridge._pending.has(TOKEN) is False
+
+
+def test_model_picker_sets_model(bridge):
+    bridge.oc.models_list = [{"providerID": "anthropic", "id": "claude-x"}]
+    bridge._handle_message(TOKEN, _msg("/model"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    assert bridge.store.get(TOKEN).model == "anthropic/claude-x"
+
+
+def test_agent_picker_sets_agent(bridge):
+    bridge.oc.agents_list = [{"name": "plan", "description": "planning"}, {"name": "build"}]
+    bridge._handle_message(TOKEN, _msg("/agent"))
+    bridge._handle_message(TOKEN, _msg("1"))
+    assert bridge.store.get(TOKEN).agent == "plan"
+
+
+def test_agent_set_directly(bridge):
+    bridge._handle_message(TOKEN, _msg("/agent build"))
+    assert bridge.store.get(TOKEN).agent == "build"
+
+
+def test_selection_non_number_falls_through(bridge):
+    bridge.oc.sessions_list = [{"id": "ses_a", "title": "Alpha"}]
+    bridge._handle_message(TOKEN, _msg("/sessions"))
+    # A non-numeric message is treated as a new prompt, not a selection.
+    bridge._handle_message(TOKEN, _msg("do something else"))
+    _join_workers(bridge)
+    assert "done" in bridge.gw.sent
 
 
 def test_no_attachment_without_webdav_dir(bridge):

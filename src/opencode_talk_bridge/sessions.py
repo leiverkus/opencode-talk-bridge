@@ -16,10 +16,18 @@ CREATE TABLE IF NOT EXISTS conversations (
     token                 TEXT PRIMARY KEY,
     opencode_session_id   TEXT,
     model                 TEXT,
+    agent                 TEXT,
+    tts_enabled           INTEGER NOT NULL DEFAULT 0,
     last_known_message_id INTEGER NOT NULL DEFAULT 0,
     updated_at            INTEGER NOT NULL DEFAULT 0
 );
 """
+
+# Columns added after 0.1.x; applied idempotently for existing databases.
+_MIGRATIONS = (
+    "ALTER TABLE conversations ADD COLUMN agent TEXT",
+    "ALTER TABLE conversations ADD COLUMN tts_enabled INTEGER NOT NULL DEFAULT 0",
+)
 
 
 @dataclass
@@ -28,6 +36,8 @@ class ConversationState:
     opencode_session_id: str | None
     model: str | None
     last_known_message_id: int
+    agent: str | None = None
+    tts_enabled: bool = False
 
 
 class SessionStore:
@@ -41,6 +51,11 @@ class SessionStore:
         self._lock = threading.Lock()
         with self._lock:
             self._conn.executescript(_SCHEMA)
+            for migration in _MIGRATIONS:
+                try:
+                    self._conn.execute(migration)
+                except sqlite3.OperationalError:
+                    pass  # column already exists
             self._conn.commit()
 
     def close(self) -> None:
@@ -81,6 +96,12 @@ class SessionStore:
     def set_model(self, token: str, model: str | None, *, now: int = 0) -> None:
         self._upsert(token, "model", model, now)
 
+    def set_agent(self, token: str, agent: str | None, *, now: int = 0) -> None:
+        self._upsert(token, "agent", agent, now)
+
+    def set_tts(self, token: str, enabled: bool, *, now: int = 0) -> None:
+        self._upsert(token, "tts_enabled", 1 if enabled else 0, now)
+
     def update_last_message_id(self, token: str, message_id: int, *, now: int = 0) -> None:
         self._upsert(token, "last_known_message_id", message_id, now)
 
@@ -102,9 +123,12 @@ class SessionStore:
 
 
 def _row_to_state(row: sqlite3.Row) -> ConversationState:
+    keys = row.keys()
     return ConversationState(
         token=row["token"],
         opencode_session_id=row["opencode_session_id"],
         model=row["model"],
         last_known_message_id=row["last_known_message_id"],
+        agent=row["agent"] if "agent" in keys else None,
+        tts_enabled=bool(row["tts_enabled"]) if "tts_enabled" in keys else False,
     )

@@ -115,8 +115,18 @@ class TalkGateway:
 
     # --- write -------------------------------------------------------------
 
-    def send(self, token: str, text: str, reply_to: int | None = None) -> None:
-        self._talk.send_message(token, text, reply_to=reply_to)
+    def send(self, token: str, text: str, reply_to: int | None = None) -> int:
+        """Post a message; return its id (so it can be edited for streaming)."""
+        msg = self._talk.send_message(token, text, reply_to=reply_to)
+        return msg.id
+
+    def edit(self, token: str, message_id: int, text: str) -> None:
+        """Edit a previously-sent message (own messages, ≤24 h)."""
+        self._talk.edit_message(token, message_id, text)
+
+    def download(self, webdav_path: str) -> bytes:
+        """Download a file from Nextcloud by its WebDAV path (for attachments)."""
+        return self._webdav.download(webdav_path)
 
     def upload_and_share(
         self,

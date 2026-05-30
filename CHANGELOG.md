@@ -6,6 +6,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- **Live response streaming**: the assistant reply is streamed into a single
+  Talk message via editing (`PUT`, throttled by `STREAM_THROTTLE_MS`), instead
+  of one post at the end. Toggle with `RESPONSE_STREAMING`.
+- **Tool & thinking notices** from the SSE stream (`💻 bash`, `💭 …`), each tool
+  announced once per turn; toggle with `HIDE_TOOL_MESSAGES` / `HIDE_THINKING`.
+- **Agent questions** (`question.asked`) are surfaced into Talk and answered by
+  a numbered option or free text.
+- **Numbered-text pickers** (Talk has no buttons): `/sessions` (switch),
+  `/model` (pick), `/agent` (pick plan/build/…); `/agent <name>` sets directly.
+- OpenCode client wrappers for sessions (rename/revert/unrevert/fork), projects,
+  worktrees, models, agents, commands, MCP, and question reply/reject.
+
+### Changed
+- Internal refactor: unified pending-interaction registry (`pending.py`),
+  streaming substrate (`streaming.py`), and typed SSE dispatch (`events.py`).
+- `TalkGateway.send` now returns the message id; added `edit`/`download`.
+
 ## [0.1.1] - 2026-05-30
 
 ### Changed

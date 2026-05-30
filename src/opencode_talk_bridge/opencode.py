@@ -62,6 +62,48 @@ class PermissionAsk:
 
 
 @dataclass(frozen=True)
+class QuestionOption:
+    label: str  # also the value sent back in the answer
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class QuestionAsk:
+    """A pending agent question surfaced by the SSE stream.
+
+    A question carries one or more sub-questions, each with options and an
+    optional free-text ("custom") answer. The bridge handles the common case:
+    a single question, rendered as a numbered picker (plus free text if custom).
+    The selected option's ``label`` is what gets sent back as the answer.
+    """
+
+    request_id: str
+    session_id: str
+    question: str
+    header: str
+    options: tuple[QuestionOption, ...]
+    custom: bool
+
+    @classmethod
+    def from_request(cls, raw: dict[str, Any]) -> QuestionAsk:
+        questions = raw.get("questions") or [{}]
+        first = questions[0] if questions else {}
+        options = tuple(
+            QuestionOption(label=o.get("label", ""), description=o.get("description", ""))
+            for o in (first.get("options") or [])
+            if isinstance(o, dict)
+        )
+        return cls(
+            request_id=raw["id"],
+            session_id=raw.get("sessionID", ""),
+            question=first.get("question", ""),
+            header=first.get("header", ""),
+            options=options,
+            custom=bool(first.get("custom")),
+        )
+
+
+@dataclass(frozen=True)
 class PromptResult:
     """The outcome of a blocking prompt: assistant text + any errors."""
 
@@ -129,21 +171,93 @@ class OpenCodeClient:
     def abort(self, session_id: str) -> bool:
         return bool(self._post(f"/session/{session_id}/abort", {}))
 
-    def prompt(self, session_id: str, text: str, *, model: str | None = None) -> PromptResult:
+    def prompt(
+        self,
+        session_id: str,
+        text: str,
+        *,
+        model: str | None = None,
+        agent: str | None = None,
+        extra_parts: list[dict[str, Any]] | None = None,
+    ) -> PromptResult:
         """Send a prompt and block until the assistant turn completes.
 
-        ``model`` overrides the default; format "providerID/modelID".
+        ``model`` overrides the default ("providerID/modelID"); ``agent`` selects
+        an agent (e.g. "plan"/"build"); ``extra_parts`` appends file parts.
         """
-        body: dict[str, Any] = {"parts": [{"type": "text", "text": text}]}
+        parts: list[dict[str, Any]] = [{"type": "text", "text": text}]
+        if extra_parts:
+            parts.extend(extra_parts)
+        body: dict[str, Any] = {"parts": parts}
         model_ref = _parse_model(model or self._default_model)
         if model_ref is not None:
             body["model"] = model_ref
+        if agent:
+            body["agent"] = agent
         data = self._post(
             f"/session/{session_id}/message",
             body,
             timeout=self._prompt_timeout,
         )
         return _prompt_result(data)
+
+    def rename_session(self, session_id: str, title: str) -> None:
+        self._patch(f"/session/{session_id}", {"title": title})
+
+    def revert(self, session_id: str, message_id: str, part_id: str | None = None) -> None:
+        body: dict[str, Any] = {"messageID": message_id}
+        if part_id:
+            body["partID"] = part_id
+        self._post(f"/session/{session_id}/revert", body)
+
+    def unrevert(self, session_id: str) -> None:
+        self._post(f"/session/{session_id}/unrevert", {})
+
+    def fork(self, session_id: str, message_id: str) -> str:
+        data = self._post(f"/session/{session_id}/fork", {"messageID": message_id})
+        new_id = data.get("id") if isinstance(data, dict) else None
+        if not new_id:
+            raise OpenCodeError(f"fork returned no id: {data!r}")
+        return new_id
+
+    def session_messages(self, session_id: str) -> list[dict[str, Any]]:
+        return self._get(f"/session/{session_id}/message") or []
+
+    # --- projects / worktrees ---------------------------------------------
+
+    def list_projects(self) -> list[dict[str, Any]]:
+        return self._get("/project") or []
+
+    def current_project(self) -> dict[str, Any] | None:
+        return self._get("/project/current")
+
+    def list_worktrees(self) -> list[str]:
+        return self._get("/experimental/worktree") or []
+
+    # --- models / agents / commands / mcp ---------------------------------
+
+    def list_models(self) -> list[dict[str, Any]]:
+        return self._get("/api/model") or []
+
+    def list_agents(self) -> list[dict[str, Any]]:
+        return self._get("/agent") or []
+
+    def list_commands(self) -> list[dict[str, Any]]:
+        return self._get("/command") or []
+
+    def run_command(self, session_id: str, command: str, arguments: str = "") -> PromptResult:
+        body: dict[str, Any] = {"command": command}
+        if arguments:
+            body["arguments"] = arguments
+        data = self._post(f"/session/{session_id}/command", body, timeout=self._prompt_timeout)
+        return _prompt_result(data)
+
+    def list_mcps(self) -> dict[str, Any]:
+        return self._get("/mcp") or {}
+
+    def toggle_mcp(self, name: str, enable: bool) -> bool:
+        action = "connect" if enable else "disconnect"
+        return bool(self._post(f"/mcp/{name}/{action}", {}))
 
     # --- permissions -------------------------------------------------------
 
@@ -157,6 +271,16 @@ class OpenCodeClient:
         if message:
             body["message"] = message
         return bool(self._post(f"/permission/{request_id}/reply", body))
+
+    # --- questions ---------------------------------------------------------
+
+    def reply_question(self, request_id: str, answer: str) -> bool:
+        """Answer a single-question agent prompt. ``answer`` is the chosen
+        option label (or free text when the question allows custom input)."""
+        return bool(self._post(f"/question/{request_id}/reply", {"answers": [[answer]]}))
+
+    def reject_question(self, request_id: str) -> bool:
+        return bool(self._post(f"/question/{request_id}/reject", {}))
 
     # --- events (SSE) ------------------------------------------------------
 
@@ -205,6 +329,13 @@ class OpenCodeClient:
             )
         except httpx.TransportError as exc:
             raise OpenCodeDownError(f"POST {path} failed: {exc}") from exc
+        return self._unwrap(resp, path)
+
+    def _patch(self, path: str, body: dict[str, Any]) -> Any:
+        try:
+            resp = self._client.patch(path, json=body, params=self._dir_params())
+        except httpx.TransportError as exc:
+            raise OpenCodeDownError(f"PATCH {path} failed: {exc}") from exc
         return self._unwrap(resp, path)
 
     def _dir_params(self) -> dict[str, str] | None:
