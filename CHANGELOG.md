@@ -6,6 +6,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-06-01
+
+### Docs
+- Republish so the **PyPI project description** reflects the corrected README
+  (the `uv tool install opencode-talk-bridge` instructions). The 0.2.7 page was
+  built from the README commit just before the PyPI-primary install flip.
+
 ## [0.2.7] - 2026-06-01
 
 First release published to **PyPI** — `uv tool install opencode-talk-bridge`
@@ -163,7 +170,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...v0.2.5
