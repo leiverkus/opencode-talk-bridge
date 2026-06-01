@@ -236,13 +236,15 @@ instance as semi-trusted infrastructure. The trust boundary and mitigations:
 ## Development
 
 ```bash
+pip install -e ".[dev]"
 ruff check src tests
 ruff format --check src tests
 pytest
 ```
 
 All tests use mocked HTTP for both Talk and OpenCode — no live calls. CI runs
-the matrix on Python 3.10–3.13.
+the matrix on Python 3.10–3.13. Dev setup, conventions, and the (one-command)
+release process are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Changelog
 
