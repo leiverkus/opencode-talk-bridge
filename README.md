@@ -59,6 +59,10 @@ uv tool install git+https://github.com/leiverkus/opencode-talk-bridge.git
 # or:  pipx install git+https://github.com/leiverkus/opencode-talk-bridge.git
 ```
 
+> Once the first PyPI release is published this becomes
+> `uv tool install opencode-talk-bridge` (no git URL) — see
+> [docs/publishing.md](docs/publishing.md).
+
 Then create your config interactively and run:
 
 ```bash

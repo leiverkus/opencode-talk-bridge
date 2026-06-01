@@ -11,6 +11,20 @@ requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Patrick Leiverkus" }]
 keywords = ["nextcloud", "talk", "opencode", "bridge", "ai", "coding-agent"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
     # The reusable OCS client, published on PyPI from the MCP monorepo.
     # Never reimplement or vendor it; track the 1.x SemVer line.
