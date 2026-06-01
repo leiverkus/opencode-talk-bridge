@@ -6,12 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-06-01
+
+First release published to **PyPI** — `uv tool install opencode-talk-bridge`
+(or `pipx install …`) now works without a git URL.
+
 ### Added
-- PyPI Trusted-Publishing release workflow (`.github/workflows/publish.yml`):
-  on each `vX.Y.Z` tag it guards the tag↔version match, builds, `twine check`s,
-  and publishes to PyPI via OIDC (no token). Package classifiers + a
-  `docs/publishing.md` setup guide. Enables `uv tool install opencode-talk-bridge`
-  once the first release lands.
+- PyPI Trusted-Publishing workflow (`.github/workflows/publish.yml`): on each
+  `vX.Y.Z` tag it guards the tag↔version match, builds, `twine check`s, and
+  publishes to PyPI via OIDC (no token). Package classifiers + a
+  `docs/publishing.md` setup guide.
 
 ## [0.2.6] - 2026-06-01
 
@@ -159,7 +163,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...v0.2.4
