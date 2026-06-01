@@ -1,6 +1,7 @@
 # opencode-talk-bridge
 
 [![CI](https://github.com/leiverkus/opencode-talk-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/leiverkus/opencode-talk-bridge/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/opencode-talk-bridge)](https://pypi.org/project/opencode-talk-bridge/)
 [![Release](https://img.shields.io/github/v/release/leiverkus/opencode-talk-bridge?sort=semver)](https://github.com/leiverkus/opencode-talk-bridge/releases/latest)
 [![Python](https://img.shields.io/badge/python-3.10%E2%80%933.13-blue)](https://github.com/leiverkus/opencode-talk-bridge/blob/main/pyproject.toml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
@@ -50,18 +51,17 @@ Nextcloud Talk  ──long-poll──▶  bridge  ──HTTP──▶  opencode 
 
 ## Install
 
-**One command** — installs the `opencode-talk-bridge` CLI into an isolated
-environment and onto your `PATH` ([uv](https://docs.astral.sh/uv/) or
+**One command** — installs the `opencode-talk-bridge` CLI from PyPI into an
+isolated environment and onto your `PATH` ([uv](https://docs.astral.sh/uv/) or
 [pipx](https://pipx.pypa.io/)):
 
 ```bash
-uv tool install git+https://github.com/leiverkus/opencode-talk-bridge.git
-# or:  pipx install git+https://github.com/leiverkus/opencode-talk-bridge.git
+uv tool install opencode-talk-bridge
+# or:  pipx install opencode-talk-bridge
 ```
 
-> Once the first PyPI release is published this becomes
-> `uv tool install opencode-talk-bridge` (no git URL) — see
-> [docs/publishing.md](docs/publishing.md).
+For the unreleased latest commit, install from git instead:
+`uv tool install git+https://github.com/leiverkus/opencode-talk-bridge.git`.
 
 Then create your config interactively and run:
 
