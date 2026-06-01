@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "opencode-talk-bridge"
-version = "0.2.5"
+version = "0.2.6"
 description = "Drive a local OpenCode instance from Nextcloud Talk via polling — a self-hosted chat bridge for a coding agent."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -12,10 +12,9 @@ license = { text = "MIT" }
 authors = [{ name = "Patrick Leiverkus" }]
 keywords = ["nextcloud", "talk", "opencode", "bridge", "ai", "coding-agent"]
 dependencies = [
-    # The OCS client lives in the MCP repo and is consumed as a pinned git
-    # dependency — never reimplement or vendor it. The repo is public, so CI
-    # resolves this anonymously.
-    "nextcloud-talk-core @ git+https://github.com/leiverkus/nextcloud-talk-mcp.git@core-v1.0.0#subdirectory=packages/nextcloud-talk-core",
+    # The reusable OCS client, published on PyPI from the MCP monorepo.
+    # Never reimplement or vendor it; track the 1.x SemVer line.
+    "nextcloud-talk-core>=1.0.2,<2",
     "httpx>=0.27",
 ]
 
@@ -35,10 +34,6 @@ Repository = "https://github.com/leiverkus/opencode-talk-bridge"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/opencode_talk_bridge"]
-
-[tool.hatch.metadata]
-# Required to allow the direct git reference in dependencies.
-allow-direct-references = true
 
 [tool.ruff]
 line-length = 110

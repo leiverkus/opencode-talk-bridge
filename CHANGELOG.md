@@ -6,6 +6,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-06-01
+
+### Changed
+- `nextcloud-talk-core` is now a normal **PyPI dependency** (`>=1.0.2,<2`)
+  instead of a pinned git URL — it has been published to PyPI. Simpler installs
+  and resolution; dropped `allow-direct-references` and the git-dep notes in the
+  README/CI. Verified our used API (TalkClient/OCSClient methods) is unchanged in
+  1.0.2 and the full suite passes against it.
+
 ## [0.2.5] - 2026-06-01
 
 ### Fixed
@@ -143,7 +152,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...v0.2.3

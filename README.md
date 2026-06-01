@@ -88,9 +88,8 @@ cp .env.example .env            # then edit .env
 ```
 </details>
 
-The OCS client lives in a separate repo and is pulled in as a **pinned git
-dependency** (`nextcloud-talk-core @ …@core-v1.0.0`); the repo is public, so the
-install needs no credentials.
+The OCS client is the separate [`nextcloud-talk-core`](https://pypi.org/project/nextcloud-talk-core/)
+package from PyPI (tracking the 1.x line) — never reimplemented or vendored here.
 
 ## Configure
 
