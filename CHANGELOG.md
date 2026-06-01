@@ -6,6 +6,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-06-01
+
+### Fixed
+- **No server text leaks into chat.** The prompt worker caught generic
+  exceptions and posted `Fehler: {exc}`; an `OpenCodeError` carries up to ~300
+  chars of the OpenCode HTTP response body, which could reach Talk. The worker
+  (both session-setup and prompt paths) now catches `OpenCodeError` and posts a
+  generic `oc_error` message, logging the details only — matching the command
+  handlers. Remaining `error: {exc}` paths only fire for local validation errors
+  (e.g. a bad model string), which carry no server body.
+
 ## [0.2.4] - 2026-05-31
 
 Hardening pass from a code review.
@@ -132,7 +143,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...HEAD
+[0.2.5]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...v0.2.5
 [0.2.4]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...v0.2.2

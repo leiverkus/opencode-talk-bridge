@@ -716,6 +716,12 @@ class Bridge:
             self._say(token, self._t("down"))
             self._status.update(state="opencode_down", opencode_healthy=False)
             return
+        except OpenCodeError as exc:
+            # An OpenCode HTTP error carries server response text — log it, but
+            # post only a generic message so nothing leaks into the chat.
+            log.warning("[%s] session setup failed: %s", token, exc)
+            self._say(token, self._t("oc_error"))
+            return
         except Exception as exc:  # noqa: BLE001 - report any setup failure to the user
             log.exception("session setup failed")
             self._say(token, self._t("error", error=exc))
@@ -731,6 +737,12 @@ class Bridge:
             self._end_turn(session_id)
             self._say(token, self._t("down"))
             self._status.update(state="opencode_down", opencode_healthy=False)
+            return
+        except OpenCodeError as exc:
+            log.warning("[%s] prompt failed: %s", token, exc)  # details to log only
+            self._finalize_or_say(token, stream, self._t("oc_error"))
+            self._end_turn(session_id)
+            self._status.update(state="polling")
             return
         except Exception as exc:  # noqa: BLE001
             log.exception("prompt failed")

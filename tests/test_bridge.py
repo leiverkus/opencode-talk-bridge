@@ -652,6 +652,30 @@ def test_permission_asked_event_routes_to_conversation(bridge):
 # --- review hardening: error isolation + /task validation -----------------
 
 
+def test_prompt_opencode_error_does_not_leak_server_text(bridge):
+    # An OpenCode HTTP error's message includes server response body; the worker
+    # must post only a generic message and keep the body out of the chat.
+    def boom(session_id, text, model=None, agent=None, extra_parts=None):
+        raise OpenCodeError("/session/x/message -> HTTP 500: SECRET_SERVER_BODY")
+
+    bridge.oc.prompt = boom
+    bridge._handle_message(TOKEN, _msg("do work"))
+    _join_workers(bridge)
+    assert not any("SECRET_SERVER_BODY" in m for m in bridge.gw.sent)
+    assert any("OpenCode-Fehler" in m or "OpenCode error" in m for m in bridge.gw.sent)
+
+
+def test_session_setup_opencode_error_does_not_leak(bridge):
+    def boom(title=None, directory=None):
+        raise OpenCodeError("/session -> HTTP 503: ANOTHER_SECRET")
+
+    bridge.oc.create_session = boom
+    bridge._handle_message(TOKEN, _msg("hi there"))
+    _join_workers(bridge)
+    assert not any("ANOTHER_SECRET" in m for m in bridge.gw.sent)
+    assert any("OpenCode-Fehler" in m or "OpenCode error" in m for m in bridge.gw.sent)
+
+
 def test_command_opencode_error_does_not_escape(bridge):
     # An OpenCode HTTP 4xx/5xx in a command handler must be caught (not kill the
     # poll thread) and surface a clean message.
