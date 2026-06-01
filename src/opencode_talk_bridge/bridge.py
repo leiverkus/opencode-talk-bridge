@@ -38,7 +38,14 @@ from .events import (
     classify,
 )
 from .messages import translator
-from .opencode import OpenCodeClient, OpenCodeDownError, PermissionAsk, PromptResult, QuestionAsk
+from .opencode import (
+    OpenCodeClient,
+    OpenCodeDownError,
+    OpenCodeError,
+    PermissionAsk,
+    PromptResult,
+    QuestionAsk,
+)
 from .pending import (
     PendingRegistry,
     PermissionPending,
@@ -192,7 +199,14 @@ class Bridge:
                 self._store.update_last_message_id(token, last_id, now=_now())
                 if self._stop.is_set():
                     break
-                self._handle_message(token, msg)
+                # Last-resort isolation: a single bad message (e.g. an OpenCode
+                # HTTP 4xx/5xx in a command handler) must never kill this
+                # conversation's poll thread. Log it, tell the user, keep polling.
+                try:
+                    self._handle_message(token, msg)
+                except Exception:  # noqa: BLE001
+                    log.exception("[%s] error handling message %s", token, msg.id)
+                    self._say(token, self._t("unexpected"))
 
     def _handle_message(self, token: str, msg: IncomingMessage) -> None:
         # Never react to system messages or our own posts (avoids loops).
@@ -296,8 +310,17 @@ class Bridge:
             "status": lambda: self._handle_status(token),
         }
         handler = handlers.get(cmd.name)
-        if handler:
+        if not handler:
+            return
+        # Command handlers run inline on the poll thread and call OpenCode; a
+        # non-down HTTP error (4xx/5xx -> OpenCodeError) would otherwise escape.
+        try:
             handler()
+        except OpenCodeDownError:
+            self._say(token, self._t("down"))
+        except OpenCodeError as exc:
+            log.warning("[%s] command /%s failed: %s", token, cmd.name, exc)
+            self._say(token, self._t("oc_error"))
 
     def _cmd_new(self, token: str) -> None:
         self._store.clear_session(token, now=_now())
@@ -941,7 +964,7 @@ def _parse_task_arg(arg: str) -> tuple[int, int, str] | None:
     """Parse `/task` args into (run_in_seconds, interval_seconds, prompt).
 
     Forms: "<minutes> <prompt>" (one-shot) or "every <minutes> <prompt>".
-    Returns None if the syntax is invalid.
+    Requires minutes >= 1 and a non-empty prompt; returns None otherwise.
     """
     parts = arg.split(maxsplit=1)
     if len(parts) < 2:
@@ -949,13 +972,20 @@ def _parse_task_arg(arg: str) -> tuple[int, int, str] | None:
     head, rest = parts
     if head.lower() in ("every", "alle"):
         sub = rest.split(maxsplit=1)
-        if len(sub) < 2 or not sub[0].isdigit():
+        if len(sub) < 2:
             return None
-        minutes = int(sub[0])
-        return minutes * 60, minutes * 60, sub[1].strip()
-    if head.isdigit():
-        return int(head) * 60, 0, rest.strip()
-    return None
+        minutes_str, prompt = sub[0], sub[1].strip()
+        return _build_task(minutes_str, prompt, recurring=True)
+    return _build_task(head, rest.strip(), recurring=False)
+
+
+def _build_task(minutes_str: str, prompt: str, *, recurring: bool) -> tuple[int, int, str] | None:
+    if not minutes_str.isdigit() or not prompt:
+        return None
+    minutes = int(minutes_str)
+    if minutes < 1:
+        return None
+    return minutes * 60, (minutes * 60 if recurring else 0), prompt
 
 
 def _message_label(message: dict) -> str:

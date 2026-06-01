@@ -4,9 +4,9 @@ import threading
 
 import pytest
 
-from opencode_talk_bridge.bridge import Bridge
+from opencode_talk_bridge.bridge import Bridge, _parse_task_arg
 from opencode_talk_bridge.config import Config
-from opencode_talk_bridge.opencode import OpenCodeDownError, PermissionAsk, PromptResult
+from opencode_talk_bridge.opencode import OpenCodeDownError, OpenCodeError, PermissionAsk, PromptResult
 from opencode_talk_bridge.pending import PermissionPending
 from opencode_talk_bridge.sessions import SessionStore
 from opencode_talk_bridge.status import StatusWriter
@@ -647,3 +647,70 @@ def test_permission_asked_event_routes_to_conversation(bridge):
     )
     assert bridge._pending.has(TOKEN) is True
     assert any("OpenCode möchte" in m for m in bridge.gw.sent)
+
+
+# --- review hardening: error isolation + /task validation -----------------
+
+
+def test_command_opencode_error_does_not_escape(bridge):
+    # An OpenCode HTTP 4xx/5xx in a command handler must be caught (not kill the
+    # poll thread) and surface a clean message.
+    def boom(_directory=None):
+        raise OpenCodeError("HTTP 500")
+
+    bridge.oc.list_sessions = boom
+    # Drive it the way the poll loop does (through the isolation wrapper).
+    try:
+        bridge._handle_message(TOKEN, _msg("/sessions"))
+    except Exception as exc:  # pragma: no cover - must not happen
+        raise AssertionError(f"command error escaped: {exc}") from exc
+    assert any("OpenCode-Fehler" in m or "OpenCode error" in m for m in bridge.gw.sent)
+
+
+def test_poll_loop_isolates_unexpected_errors(bridge):
+    # Drive the REAL _poll_loop: a non-OpenCode bug while handling a message must
+    # not kill the poll thread — it logs, notifies, and keeps polling.
+    def kaboom(_directory=None):
+        raise RuntimeError("unexpected bug")
+
+    bridge.oc.list_sessions = kaboom
+
+    calls = {"n": 0}
+
+    def fake_poll(token, last_id, timeout=30):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return [_msg("/sessions", mid=5)]
+        bridge._stop.set()  # end the loop after the second poll
+        return []
+
+    bridge.gw.poll = fake_poll
+    bridge._poll_loop(TOKEN)  # must return cleanly, not raise
+
+    assert calls["n"] >= 2  # kept polling after the bad message
+    assert any("Unerwartet" in x or "Unexpected" in x for x in bridge.gw.sent)
+
+
+@pytest.mark.parametrize(
+    "arg,expected",
+    [
+        ("30 do the thing", (1800, 0, "do the thing")),
+        ("every 60 ping", (3600, 3600, "ping")),
+        ("0 now please", None),  # 0 minutes rejected
+        ("every 0 loop", None),  # 0-minute interval rejected
+        ("5", None),  # no prompt
+        ("nonsense prompt", None),  # non-numeric minutes
+        ("every 5", None),  # recurring without prompt
+    ],
+)
+def test_parse_task_arg(arg, expected):
+    assert _parse_task_arg(arg) == expected
+
+
+def test_task_zero_minutes_rejected(bridge, tmp_path):
+    from opencode_talk_bridge.scheduler import TaskStore
+
+    bridge._task_store = TaskStore(str(tmp_path / "t.sqlite3"))
+    bridge._handle_message(TOKEN, _msg("/task 0 immediately"))
+    assert bridge._task_store.count() == 0
+    bridge._task_store.close()

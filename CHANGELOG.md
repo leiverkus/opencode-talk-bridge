@@ -6,6 +6,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-05-31
+
+Hardening pass from a code review.
+
+### Fixed
+- **Error isolation.** Command handlers run inline on the poll thread and only
+  caught `OpenCodeDownError`; an OpenCode HTTP 4xx/5xx (`OpenCodeError`) could
+  escape and kill a conversation's poll thread. The poll loop now isolates every
+  message (logs + notifies + keeps polling), and command dispatch catches
+  `OpenCodeError` with a clean message.
+- **`/task` validation.** Reject `0`-minute schedules and empty prompts
+  (`minutes >= 1` and a non-empty prompt are now required).
+
+### Internal
+- Added tests for `__main__` (CLI wiring: `--check`/`--init`/run, 0→90%) and the
+  Talk gateway / message parsing (57→95%); overall coverage 76→82%.
+
 ## [0.2.3] - 2026-05-31
 
 ### Fixed
@@ -115,7 +132,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.0...v0.2.1
