@@ -67,9 +67,32 @@ gh release create vX.Y.Z --title "vX.Y.Z — <title>" --notes "<notes>"
 ```
 
 The publish workflow **guards** that the tag matches `pyproject.toml` and runs
-`twine check`, so a version mismatch fails fast and never reaches PyPI. First-time
-PyPI/Trusted-Publisher setup is documented in
+`twine check`, so a version mismatch fails fast and never reaches PyPI. How
+Trusted Publishing is wired up is documented in
 [`docs/publishing.md`](docs/publishing.md).
+
+### Live smoke test (required before a *stable* release)
+
+The automated suite is entirely mocked. Before tagging a stable release
+(`1.0.0` or any later non-pre-release), complete
+[`docs/smoke-test.md`](docs/smoke-test.md) against a **real** Nextcloud Talk
+instance + `opencode serve`, and record the OpenCode version you tested. A
+`0.x` or `-rc` release may ship without it, but the install/feature surface it
+exercises (allowlist on real `actorId`, permission flow, streaming) is only
+verifiable live.
+
+### Pre-1.0 checklist
+
+When promoting to `1.0.0`:
+
+1. The live smoke test above has passed on a real instance.
+2. Bump the classifier `Development Status :: 4 - Beta` →
+   `5 - Production/Stable` in `pyproject.toml` (do this **only** at `1.0.0`, not
+   while still on `0.x`).
+3. Re-read the [Stability](README.md#stability) contract — anything you are not
+   prepared to keep stable must change *before* `1.0.0`, not after.
+4. Consider a `1.0.0rc1` (or a final `0.x`) used live for a while first, then
+   `1.0.0`.
 
 ## Reporting
 

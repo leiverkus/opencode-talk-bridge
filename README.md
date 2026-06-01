@@ -46,7 +46,8 @@ Nextcloud Talk  ──long-poll──▶  bridge  ──HTTP──▶  opencode 
 - Python ≥ 3.10, macOS or Linux.
 - A Nextcloud account with **Talk** and an **app password**
   (Settings → Security → App passwords) — not your login password.
-- A running `opencode serve` (OpenCode ≥ 1.15). Default endpoint
+- A running `opencode serve`. **Tested against OpenCode 1.15.11**; expected
+  compatible with the OpenCode 1.15+ HTTP API until it changes. Default endpoint
   `http://127.0.0.1:4096`.
 
 ## Install
@@ -232,6 +233,31 @@ instance as semi-trusted infrastructure. The trust boundary and mitigations:
   threat model.
 - **Local-only OpenCode.** Keep `opencode serve` bound to `127.0.0.1`. If you
   expose it, secure it with `OPENCODE_USERNAME`/`OPENCODE_PASSWORD`.
+
+To report a vulnerability, see [SECURITY.md](SECURITY.md) (please don't open a
+public issue).
+
+## Stability
+
+This project follows [SemVer](https://semver.org/). **From `1.0.0`**, the
+following are the stable public contract — breaking changes to them only happen
+on a major bump:
+
+- **CLI:** the `opencode-talk-bridge` command and its flags (`--init`,
+  `--check`, `--env-file`).
+- **Configuration:** the documented `.env` keys (see [`.env.example`](.env.example))
+  and their meaning.
+- **Talk commands:** the slash-command names (`/new`, `/sessions`, …).
+- **Status file:** the JSON schema and its `state` values.
+- **State store:** SQLite migrations stay forward-compatible — upgrading never
+  requires deleting your database.
+
+**Not** covered (may change in any release): the Python module/API layout,
+exact wording of bot replies and log lines (the i18n strings), and which
+OpenCode/Nextcloud versions are supported.
+
+Pre-`1.0.0` (the current `0.x` line) these may still change between minor
+versions; pin a version you have tested.
 
 ## Development
 

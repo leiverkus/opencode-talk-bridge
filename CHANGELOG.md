@@ -6,6 +6,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-01
+
+v1 candidate — documentation, security, and stability hygiene (no behaviour
+changes). Still `0.x` / Beta until a live smoke test on a real instance.
+
+### Added
+- `SECURITY.md` — private vulnerability reporting, scope, and response policy.
+- README **Stability** section: the SemVer public contract from `1.0.0` (CLI
+  flags, `.env` keys, Talk commands, status JSON, forward-compatible migrations).
+- `CONTRIBUTING.md`: the live smoke test is now a **required gate before a stable
+  release**, plus a pre-1.0 checklist (incl. flipping the classifier).
+- Issue forms (`bug_report`, `feature_request`), an issue-template `config`
+  routing security reports to private advisories, and a PR template.
+
+### Changed
+- `__version__` is derived from package metadata — single source of truth in
+  `pyproject.toml` (no second bump in `__init__.py`).
+- Clarified OpenCode compatibility: **tested against 1.15.11**, expected
+  compatible with the 1.15+ HTTP API.
+- Refreshed `docs/publishing.md` for the live (post-first-publish) state.
+
 ## [0.2.8] - 2026-06-01
 
 ### Docs
@@ -170,7 +191,8 @@ Initial release.
 - `nextcloud-talk-core`, pinned to the `core-v1.0.0` git tag.
 - `httpx >= 0.27`.
 
-[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.8...v0.3.0
 [0.2.8]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/leiverkus/opencode-talk-bridge/compare/v0.2.5...v0.2.6
