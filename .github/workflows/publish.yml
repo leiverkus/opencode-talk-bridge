@@ -4,7 +4,7 @@ name: Publish to PyPI
 # Trusted Publishing (OIDC) — no API token is stored in the repo.
 #
 # One-time PyPI setup (see docs/publishing.md): add a Trusted Publisher for the
-# project pointing at this repo, workflow `release.yml`, and environment `pypi`.
+# project pointing at this repo, workflow `publish.yml`, and environment `pypi`.
 
 on:
   push:

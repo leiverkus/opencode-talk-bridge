@@ -1,7 +1,7 @@
 # Publishing to PyPI
 
 Releases are published automatically by
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) on every
+[`.github/workflows/publish.yml`](../.github/workflows/publish.yml) on every
 `vX.Y.Z` tag, using **PyPI Trusted Publishing (OIDC)** — no API token is stored
 in the repository.
 
@@ -19,7 +19,7 @@ the first tagged build will create the project and publish it.
    | PyPI Project Name | `opencode-talk-bridge` |
    | Owner | `leiverkus` |
    | Repository name | `opencode-talk-bridge` |
-   | Workflow name | `release.yml` |
+   | Workflow name | `publish.yml` |
    | Environment name | `pypi` |
 4. Save.
 

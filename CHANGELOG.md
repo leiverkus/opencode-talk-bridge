@@ -7,7 +7,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
-- PyPI Trusted-Publishing release workflow (`.github/workflows/release.yml`):
+- PyPI Trusted-Publishing release workflow (`.github/workflows/publish.yml`):
   on each `vX.Y.Z` tag it guards the tag↔version match, builds, `twine check`s,
   and publishes to PyPI via OIDC (no token). Package classifiers + a
   `docs/publishing.md` setup guide. Enables `uv tool install opencode-talk-bridge`
